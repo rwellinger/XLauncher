@@ -33,6 +33,7 @@ enum UserDefaultsKey: String, CaseIterable, Sendable {
     case selectedProfileId = "SelectedProfileId"
     case scriptEnvVars = "ScriptEnvVars"
     case sceneryGroups = "SceneryGroups"
+    case expandedAircraftGroups = "ExpandedAircraftGroups"
 
     // Feature Flags & CSL
     case enableCSLSupport = "EnableCSLSupport"

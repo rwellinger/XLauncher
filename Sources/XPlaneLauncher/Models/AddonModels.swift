@@ -40,13 +40,20 @@ struct Aircraft: Identifiable, Equatable, Hashable, Sendable {
     let id: UUID
     let name: String
     var isEnabled: Bool
+    /// Path relative to the central `Aircraft` folder — "B737-800X" when stored
+    /// flat, "Heli/AW109SP" when the user groups aircraft in subfolders. This is
+    /// the identity used for both symlinks and profile entries.
     let folderName: String
+    /// Name of the grouping folder this aircraft sits in, or nil when it lives
+    /// directly under `Aircraft`. Presentation only.
+    let groupName: String?
 
-    init(id: UUID = UUID(), name: String, isEnabled: Bool, folderName: String) {
+    init(id: UUID = UUID(), name: String, isEnabled: Bool, folderName: String, groupName: String? = nil) {
         self.id = id
         self.name = name
         self.isEnabled = isEnabled
         self.folderName = folderName
+        self.groupName = groupName
     }
 }
 

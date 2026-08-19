@@ -146,6 +146,27 @@ class PluginManager {
         }
     }
 
+    /// Aircraft grouping folders the user has opened. Collapsed is the default,
+    /// so a large fleet stays scannable; the choice is remembered per group.
+    var expandedAircraftGroups: Set<String> = [] {
+        didSet {
+            guard !isLoading else { return }
+            defaults.set(Array(expandedAircraftGroups).sorted(), forKey: .expandedAircraftGroups)
+        }
+    }
+
+    func isAircraftGroupExpanded(_ group: String) -> Bool {
+        expandedAircraftGroups.contains(group)
+    }
+
+    func toggleAircraftGroup(_ group: String) {
+        if expandedAircraftGroups.contains(group) {
+            expandedAircraftGroups.remove(group)
+        } else {
+            expandedAircraftGroups.insert(group)
+        }
+    }
+
     var profiles: [PluginProfile] = []
     var activeScripts: [ProfileScript] = []
     var activeEnvironmentVariables: [ScriptEnvVar] = []
@@ -248,6 +269,12 @@ class PluginManager {
         scanAircraft()
         scanLuaScripts()
 
+        migrateGroupedAircraft()
+
+        if let saved = defaults.object(forKey: .expandedAircraftGroups) as? [String] {
+            self.expandedAircraftGroups = Set(saved)
+        }
+
         self.scriptEnvironment = profileService.loadScriptEnvironment()
         self.sceneryGroups = profileService.loadSceneryGroups()
         self.enableCSLSupport = defaults.bool(forKey: .enableCSLSupport)
@@ -299,9 +326,9 @@ class PluginManager {
         }
 
         if let dataFolder = aircraftDataFolder {
-            symlinkService.repairStaleLinks(
+            symlinkService.repairStaleAircraftLinks(
                 in: pathService.aircraftTargetFolder(for: xPlanePath),
-                using: symlinkService.linkSources(in: dataFolder)
+                using: symlinkService.aircraftLinkSources(in: dataFolder)
             )
         }
 
@@ -317,6 +344,96 @@ class PluginManager {
                 in: targetFolder,
                 using: symlinkService.luaScriptLinkSources(in: dataFolder)
             )
+        }
+    }
+
+    // MARK: - Migration
+
+    /// Aircraft inside a grouping folder used to be managed as a single add-on
+    /// named after the group. They are now managed individually, so profiles
+    /// that stored the group name and installations that link the whole group
+    /// have to be carried over — otherwise the user's selection silently
+    /// disappears.
+    ///
+    /// Idempotent: once migrated there is no group name left to match and no
+    /// group symlink left to replace, so a later launch finds nothing to do.
+    private func migrateGroupedAircraft() {
+        let groups = Dictionary(grouping: aircraft.compactMap { item -> (String, String)? in
+            guard let group = item.groupName else { return nil }
+            return (group, item.folderName)
+        }, by: { $0.0 }).mapValues { $0.map(\.1) }
+
+        guard !groups.isEmpty else { return }
+
+        migrateProfiles(groups: groups)
+        migrateGroupSymlinks(groups: groups)
+    }
+
+    private func migrateProfiles(groups: [String: [String]]) {
+        let knownFolderNames = Set(aircraft.map(\.folderName))
+        var didChangeAny = false
+
+        for index in profiles.indices {
+            var expanded: [String] = []
+            var didChange = false
+
+            for entry in profiles[index].aircraftFolderNames {
+                if knownFolderNames.contains(entry) {
+                    expanded.append(entry)
+                } else if let members = groups[entry] {
+                    expanded.append(contentsOf: members)
+                    didChange = true
+                } else {
+                    // Neither an add-on nor a group: an add-on that is merely
+                    // absent right now must not be dropped from the profile.
+                    expanded.append(entry)
+                }
+            }
+
+            if didChange {
+                profiles[index].aircraftFolderNames = expanded
+                didChangeAny = true
+            }
+        }
+
+        if didChangeAny {
+            profileService.saveProfiles(profiles)
+        }
+    }
+
+    /// Replaces a symlink pointing at a whole grouping folder with a real folder
+    /// holding one link per aircraft, preserving what is currently enabled.
+    private func migrateGroupSymlinks(groups: [String: [String]]) {
+        guard let xPlanePath = xPlanePath, let dataFolder = aircraftDataFolder else { return }
+
+        let targetFolder = pathService.aircraftTargetFolder(for: xPlanePath)
+        var didRelink = false
+
+        for (group, members) in groups {
+            let groupLink = targetFolder.appendingPathComponent(group)
+            // Only a link we own, pointing at this group in the data folder.
+            guard symlinkService.isManagedSymlink(at: groupLink),
+                  symlinkService.linkDestination(at: groupLink)?.standardizedFileURL
+                    == dataFolder.appendingPathComponent(group).standardizedFileURL else { continue }
+
+            do {
+                try symlinkService.removeManagedLink(at: groupLink)
+                for member in members {
+                    try symlinkService.setAircraftEnabled(
+                        folderName: member,
+                        enabled: true,
+                        dataFolder: dataFolder,
+                        targetFolder: targetFolder
+                    )
+                }
+                didRelink = true
+            } catch {
+                self.lastErrorMessage = "Failed to migrate aircraft group '\(group)': \(error.localizedDescription)"
+            }
+        }
+
+        if didRelink {
+            scanAircraft()
         }
     }
 
@@ -430,6 +547,13 @@ class PluginManager {
             }
         } catch {
             self.lastErrorMessage = "Failed to \(item.isEnabled ? "disable" : "enable") aircraft '\(item.name)': \(error.localizedDescription)"
+        }
+    }
+
+    /// Enables or disables every aircraft inside a grouping folder at once.
+    func setAircraftGroupEnabled(_ group: String, isEnabled: Bool) {
+        for item in aircraft where item.groupName == group && item.isEnabled != isEnabled {
+            toggleAircraft(item)
         }
     }
 

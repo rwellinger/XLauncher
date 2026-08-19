@@ -25,10 +25,43 @@ import SwiftUI
 struct AircraftListView: View {
     @Environment(PluginManager.self) var pluginManager
 
+    /// Aircraft stored directly under the central Aircraft folder.
+    private var ungrouped: [PluginManager.Aircraft] {
+        pluginManager.aircraft.filter { $0.groupName == nil }
+    }
+
+    /// Grouping folders in the order they appear in the scanned list.
+    private var groupNames: [String] {
+        var seen: Set<String> = []
+        return pluginManager.aircraft.compactMap { item -> String? in
+            guard let group = item.groupName, seen.insert(group).inserted else { return nil }
+            return group
+        }
+    }
+
+    private func members(of group: String) -> [PluginManager.Aircraft] {
+        pluginManager.aircraft.filter { $0.groupName == group }
+    }
+
     var body: some View {
         List {
-            ForEach(pluginManager.aircraft) { item in
+            ForEach(ungrouped) { item in
                 AircraftRow(aircraft: item)
+            }
+
+            ForEach(groupNames, id: \.self) { group in
+                let items = members(of: group)
+                let isExpanded = pluginManager.isAircraftGroupExpanded(group)
+
+                Section {
+                    if isExpanded {
+                        ForEach(items) { item in
+                            AircraftRow(aircraft: item)
+                        }
+                    }
+                } header: {
+                    AircraftGroupHeader(group: group, items: items, isExpanded: isExpanded)
+                }
             }
 
             if pluginManager.aircraft.isEmpty {
@@ -92,5 +125,61 @@ struct AircraftRow: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color(NSColor.separatorColor), lineWidth: 0.5)
         )
+    }
+}
+
+struct AircraftGroupHeader: View {
+    @Environment(PluginManager.self) var pluginManager
+    let group: String
+    let items: [PluginManager.Aircraft]
+    let isExpanded: Bool
+
+    private var enabledCount: Int {
+        items.filter(\.isEnabled).count
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button {
+                withAnimation(.snappy(duration: 0.2)) {
+                    pluginManager.toggleAircraftGroup(group)
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .foregroundStyle(.secondary)
+
+                    Label(group, systemImage: isExpanded ? "folder.badge.gearshape" : "folder")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(isExpanded ? "Collapse this group" : "Expand this group")
+
+            Text("\(enabledCount)/\(items.count)")
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundStyle(enabledCount > 0 ? .green : .secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(enabledCount > 0 ? Color.green.opacity(0.12) : Color.secondary.opacity(0.12))
+                .clipShape(Capsule())
+
+            Toggle("", isOn: Binding(
+                get: { enabledCount == items.count },
+                set: { pluginManager.setAircraftGroupEnabled(group, isEnabled: $0) }
+            ))
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .labelsHidden()
+            .help("Enable or disable every aircraft in this group")
+        }
     }
 }
