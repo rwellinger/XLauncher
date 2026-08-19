@@ -64,6 +64,14 @@ struct UpdatesView: View {
                     .font(.title3)
                     .fontWeight(.bold)
 
+                if updateManager.isScanning {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Scanning add-ons...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 Spacer()
 
                 Picker("Filter", selection: $selectedFilter) {
@@ -80,7 +88,7 @@ struct UpdatesView: View {
                 }) {
                     Label("Check for Updates", systemImage: "arrow.clockwise")
                 }
-                .disabled(updateManager.isProcessing)
+                .disabled(updateManager.isProcessing || updateManager.isScanning)
 
                 Button(action: {
                     for addon in updateManager.updatableAddons where addon.isUpdateAvailable {
@@ -89,7 +97,7 @@ struct UpdatesView: View {
                 }) {
                     Label("Update All", systemImage: "square.and.arrow.down")
                 }
-                .disabled(!hasAvailableUpdates || updateManager.isProcessing)
+                .disabled(!hasAvailableUpdates || updateManager.isProcessing || updateManager.isScanning)
 
                 Button(action: {
                     showDebugConsole.toggle()
@@ -103,7 +111,10 @@ struct UpdatesView: View {
             Divider()
 
             // List / Empty State
-            if filteredAddons.isEmpty {
+            if filteredAddons.isEmpty && updateManager.isScanning {
+                ProgressView("Scanning central data folder...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if filteredAddons.isEmpty {
                 ContentUnavailableView {
                     Label("No Updatable Addons Found", systemImage: "arrow.triangle.2.circlepath")
                 } description: {

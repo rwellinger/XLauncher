@@ -69,8 +69,8 @@ struct ContentView: View {
             return list
         }
 
-        static var systemCategories: [NavigationCategory] {
-            [.updates, .settings]
+        static func systemCategories(addonUpdatesEnabled: Bool) -> [NavigationCategory] {
+            addonUpdatesEnabled ? [.updates, .settings] : [.settings]
         }
 
         var isAddonCategory: Bool {
@@ -115,7 +115,7 @@ struct ContentView: View {
                 }
 
                 Section("System") {
-                    ForEach(NavigationCategory.systemCategories) { category in
+                    ForEach(NavigationCategory.systemCategories(addonUpdatesEnabled: updateManager.enableAddonUpdates)) { category in
                         NavigationLink(value: category) {
                             HStack(spacing: 8) {
                                 Label(category.rawValue, systemImage: category.systemImage)
@@ -237,7 +237,6 @@ struct ContentView: View {
         .sheet(isPresented: $showWelcomeScreen) {
             WelcomeView {
                 updateManager.scanUpdatableAddons()
-                updateManager.checkAutoUpdates()
                 if pluginManager.enableCSLSupport && cslManager.automaticallyCheckCSLUpdates {
                     cslManager.cslFolderURL = pluginManager.cslPath
                     cslManager.scanAndCheck()

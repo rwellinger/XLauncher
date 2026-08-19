@@ -117,11 +117,23 @@ struct SettingsView: View {
                                 Toggle("X-Plane Launcher application", isOn: $appUpdateManager.automaticallyCheckOnLaunch)
                                     .font(.body)
 
+                                Toggle("Manage add-on updates", isOn: $updateManager.enableAddonUpdates)
+                                    .font(.body)
+
+                                Text("Scans the central data folder for add-ons that ship a SkunkCrafts or X-Updater configuration. Turn this off to skip the scan entirely and hide the Updates tab.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.leading, 20)
+
                                 Toggle("SkunkCrafts add-ons", isOn: $updateManager.automaticallyCheckSkunkCraftsUpdates)
                                     .font(.body)
+                                    .padding(.leading, 20)
+                                    .disabled(!updateManager.enableAddonUpdates)
 
                                 Toggle("X-Updater add-ons", isOn: $updateManager.automaticallyCheckXUpdaterUpdates)
                                     .font(.body)
+                                    .padding(.leading, 20)
+                                    .disabled(!updateManager.enableAddonUpdates)
 
                                 Toggle("X-CSL models", isOn: $cslManager.automaticallyCheckCSLUpdates)
                                     .font(.body)

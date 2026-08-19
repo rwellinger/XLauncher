@@ -29,6 +29,11 @@ struct AddonUpdateCheckResult: Sendable {
 }
 
 protocol AddonUpdater: Sendable {
+    /// Picks this backend's configuration file out of an already-read directory
+    /// listing. Taking the listing as input keeps the scan at one enumeration
+    /// per directory instead of one `stat` per candidate file name.
+    func matchConfig(in folderURL: URL, entries: Set<String>) -> URL?
+
     func checkStatus(
         for addon: UpdateManager.UpdatableAddon,
         logHandler: @Sendable @escaping @MainActor (String) -> Void

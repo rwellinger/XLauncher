@@ -26,9 +26,31 @@ import Observation
 @MainActor
 @Observable
 class UpdateManager {
-    private let fileManager = FileManager.default
-    private let pathService = PathService.shared
+    private let scanService = UpdaterScanService.shared
     private let defaults = UserDefaults.standard
+
+    /// Cancels an in-flight scan when a new one starts, so a quick succession of
+    /// data-folder changes cannot leave two scans racing to assign the result.
+    private var scanTask: Task<Void, Never>?
+
+    private(set) var isScanning = false
+
+    /// Master switch for the whole add-on update feature. Off means no scan at
+    /// all, which is the guaranteed way to a launch that touches no add-on files.
+    var enableAddonUpdates: Bool {
+        didSet {
+            guard enableAddonUpdates != oldValue else { return }
+            defaults.set(enableAddonUpdates, forKey: .enableAddonUpdates)
+            if enableAddonUpdates {
+                scanUpdatableAddons()
+            } else {
+                scanTask?.cancel()
+                scanTask = nil
+                isScanning = false
+                updatableAddons = []
+            }
+        }
+    }
 
     var automaticallyCheckSkunkCraftsUpdates: Bool {
         didSet {
@@ -46,7 +68,6 @@ class UpdateManager {
         didSet {
             guard launcherDataFolder != oldValue else { return }
             scanUpdatableAddons()
-            checkAutoUpdates()
         }
     }
 
@@ -73,55 +94,10 @@ class UpdateManager {
         logger.clear()
     }
 
-    enum UpdaterType: String, Codable, Identifiable {
-        case skunkcrafts = "SkunkCrafts"
-        case xUpdater = "X-Updater"
-        var id: String { rawValue }
-
-        var updater: any AddonUpdater {
-            switch self {
-            case .skunkcrafts:
-                return SkunkCraftsUpdaterService.shared
-            case .xUpdater:
-                return XUpdaterService.shared
-            }
-        }
-    }
-
-    enum AddonCategory: String, Codable, Identifiable, CaseIterable {
-        case aircraft = "Aircraft"
-        case plugin = "Plugin"
-        case scenery = "Scenery"
-        case luaScript = "Lua Script"
-        var id: String { rawValue }
-
-        /// Where this category's source add-ons live inside the central data folder.
-        var dataSubfolder: DataSubfolder {
-            switch self {
-            case .aircraft: return .aircraft
-            case .plugin: return .plugins
-            case .scenery: return .scenery
-            case .luaScript: return .luaScripts
-            }
-        }
-    }
-
-    struct UpdatableAddon: Identifiable, Equatable, Hashable {
-        let id = UUID()
-        let name: String
-        let addonCategory: AddonCategory
-        let folderName: String
-        let folderURL: URL
-        let updaterType: UpdaterType
-        let configFileURL: URL
-        var currentVersion: String?
-        var latestVersion: String?
-        var isUpdateAvailable: Bool = false
-        var isChecking: Bool = false
-        var isUpdating: Bool = false
-        var statusMessage: String = "Unknown"
-        var remoteManifestURL: String?
-    }
+    // Model typealiases for view compatibility
+    typealias UpdaterType = XPlaneLauncher.UpdaterType
+    typealias AddonCategory = XPlaneLauncher.AddonCategory
+    typealias UpdatableAddon = XPlaneLauncher.UpdatableAddon
 
     init(launcherDataFolder: URL? = nil) {
         if defaults.object(forKey: .autoCheckSkunkCraftsUpdates) == nil {
@@ -136,146 +112,141 @@ class UpdateManager {
             self.automaticallyCheckXUpdaterUpdates = defaults.bool(forKey: .autoCheckXUpdaterUpdates)
         }
 
+        if defaults.object(forKey: .enableAddonUpdates) == nil {
+            self.enableAddonUpdates = true
+        } else {
+            self.enableAddonUpdates = defaults.bool(forKey: .enableAddonUpdates)
+        }
+
         self.launcherDataFolder = launcherDataFolder
-        if launcherDataFolder != nil && updatableAddons.isEmpty {
+        if launcherDataFolder != nil {
             scanUpdatableAddons()
-            checkAutoUpdates()
         }
     }
 
-    // MARK: - Scanning & Parsing
+    // MARK: - Scanning
 
-    private func findUpdaterConfig(in folderURL: URL) -> (type: UpdaterType, fileURL: URL)? {
-        if let url = SkunkCraftsUpdaterService.shared.findConfig(in: folderURL) {
-            return (.skunkcrafts, url)
-        }
-        if let url = XUpdaterService.shared.findConfig(in: folderURL) {
-            return (.xUpdater, url)
-        }
-        return nil
-    }
-
-    private func parseUpdaterConfig(url: URL, type: UpdaterType, defaultName: String) -> (name: String, version: String?, remoteURL: String?) {
-        if type == .skunkcrafts {
-            if let config = SkunkCraftsUpdaterService.shared.parseConfig(at: url, defaultName: defaultName) {
-                return (config.name, config.version, config.remoteManifestURL)
-            }
-        } else if type == .xUpdater {
-            if let config = XUpdaterService.shared.parseConfig(at: url, defaultName: defaultName) {
-                return (config.name, config.version, config.remoteURL)
-            }
-        }
-        return (defaultName, nil, nil)
-    }
-
-    private func scanDirectoryForAddons(subFolderURL: URL, category: AddonCategory, currentDepth: Int = 0, maxDepth: Int = 5) -> [UpdatableAddon] {
-        var results: [UpdatableAddon] = []
-        guard currentDepth <= maxDepth else { return results }
-
-        if let contents = try? fileManager.contentsOfDirectory(at: subFolderURL, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) {
-            for itemURL in contents {
-                var isDir: ObjCBool = false
-                guard fileManager.fileExists(atPath: itemURL.path, isDirectory: &isDir), isDir.boolValue else { continue }
-
-                if let updaterInfo = findUpdaterConfig(in: itemURL) {
-                    let folderName = itemURL.lastPathComponent
-                    let (parsedName, version, remoteURL) = parseUpdaterConfig(url: updaterInfo.fileURL, type: updaterInfo.type, defaultName: folderName)
-
-                    results.append(UpdatableAddon(
-                        name: parsedName,
-                        addonCategory: category,
-                        folderName: folderName,
-                        folderURL: itemURL,
-                        updaterType: updaterInfo.type,
-                        configFileURL: updaterInfo.fileURL,
-                        currentVersion: version,
-                        remoteManifestURL: remoteURL
-                    ))
-                } else {
-                    let subResults = scanDirectoryForAddons(subFolderURL: itemURL, category: category, currentDepth: currentDepth + 1, maxDepth: maxDepth)
-                    results.append(contentsOf: subResults)
-                }
-            }
-        }
-
-        return results
-    }
-
+    /// Rescans the central data folder off the main actor and checks for updates
+    /// once the list is in place. Safe to call repeatedly: an in-flight scan is
+    /// cancelled and replaced.
     func scanUpdatableAddons() {
-        guard let dataFolder = launcherDataFolder else {
+        scanTask?.cancel()
+
+        guard enableAddonUpdates, let dataFolder = launcherDataFolder else {
+            scanTask = nil
+            isScanning = false
             updatableAddons = []
             return
         }
 
-        var allAddons: [UpdatableAddon] = []
+        isScanning = true
+        let scanService = self.scanService
 
-        for category in AddonCategory.allCases {
-            let folderURL = pathService.dataFolder(category.dataSubfolder, in: dataFolder)
-            if fileManager.fileExists(atPath: folderURL.path) {
-                let addons = scanDirectoryForAddons(subFolderURL: folderURL, category: category)
-                allAddons.append(contentsOf: addons)
-            }
+        scanTask = Task { [weak self] in
+            let found = await Task.detached(priority: .userInitiated) {
+                scanService.scanUpdatableAddons(in: dataFolder)
+            }.value
+
+            guard let self, !Task.isCancelled else { return }
+
+            self.updatableAddons = found
+            self.isScanning = false
+            self.scanTask = nil
+            self.checkAutoUpdates()
         }
-
-        self.updatableAddons = allAddons
     }
 
     // MARK: - Update Checking
 
+    /// How many add-ons are checked against their remote at the same time.
+    /// Firing one request per add-on at once turns a large collection into a
+    /// burst of network traffic right at launch.
+    private static let maxConcurrentChecks = 4
+
     func checkAutoUpdates() {
-        for addon in updatableAddons where !addon.isChecking && !addon.isUpdating {
-            if addon.updaterType == .skunkcrafts && !automaticallyCheckSkunkCraftsUpdates {
-                continue
+        guard enableAddonUpdates else { return }
+
+        let due = updatableAddons.filter { addon in
+            guard !addon.isChecking, !addon.isUpdating else { return false }
+            switch addon.updaterType {
+            case .skunkcrafts: return automaticallyCheckSkunkCraftsUpdates
+            case .xUpdater: return automaticallyCheckXUpdaterUpdates
             }
-            if addon.updaterType == .xUpdater && !automaticallyCheckXUpdaterUpdates {
-                continue
-            }
-            checkForUpdates(for: addon)
         }
+        checkForUpdates(in: due)
     }
 
     func checkAllAddonUpdates() {
-        for addon in updatableAddons where !addon.isChecking && !addon.isUpdating {
-            checkForUpdates(for: addon)
+        guard enableAddonUpdates else { return }
+        checkForUpdates(in: updatableAddons.filter { !$0.isChecking && !$0.isUpdating })
+    }
+
+    /// Runs the checks with a bounded number in flight, refilling as each one
+    /// finishes rather than waiting for the whole batch.
+    private func checkForUpdates(in addons: [UpdatableAddon]) {
+        guard !addons.isEmpty else { return }
+
+        for index in updatableAddons.indices where addons.contains(where: { $0.id == updatableAddons[index].id }) {
+            updatableAddons[index].isChecking = true
+            updatableAddons[index].statusMessage = "Checking..."
+        }
+
+        Task { @MainActor in
+            var next = 0
+            await withTaskGroup(of: Void.self) { group in
+                while next < addons.count && next < Self.maxConcurrentChecks {
+                    let addon = addons[next]
+                    group.addTask { await self.performCheck(for: addon) }
+                    next += 1
+                }
+
+                while await group.next() != nil {
+                    guard next < addons.count else { continue }
+                    let addon = addons[next]
+                    group.addTask { await self.performCheck(for: addon) }
+                    next += 1
+                }
+            }
         }
     }
 
+    /// Single-add-on entry point, used by the per-row button.
     func checkForUpdates(for addon: UpdatableAddon) {
         guard let index = updatableAddons.firstIndex(where: { $0.id == addon.id }) else { return }
         guard !updatableAddons[index].isChecking && !updatableAddons[index].isUpdating else { return }
-        updatableAddons[index].isChecking = true
-        updatableAddons[index].statusMessage = "Checking..."
+        checkForUpdates(in: [addon])
+    }
 
+    private func performCheck(for addon: UpdatableAddon) async {
         let addonId = addon.id
+
         guard let remoteURLString = addon.remoteManifestURL, !remoteURLString.isEmpty else {
-            if let i = self.updatableAddons.firstIndex(where: { $0.id == addonId }) {
-                self.updatableAddons[i].isChecking = false
-                self.updatableAddons[i].statusMessage = "Up to date"
+            if let i = updatableAddons.firstIndex(where: { $0.id == addonId }) {
+                updatableAddons[i].isChecking = false
+                updatableAddons[i].statusMessage = "Up to date"
             }
             return
         }
 
         let updater = addon.updaterType.updater
 
-        Task { @MainActor in
-            do {
-                let result = try await updater.checkStatus(for: addon) { [weak self] msg in
-                    self?.log(msg)
-                }
+        do {
+            let result = try await updater.checkStatus(for: addon) { [weak self] msg in
+                self?.log(msg)
+            }
 
-                if let i = self.updatableAddons.firstIndex(where: { $0.id == addonId }) {
-                    self.updatableAddons[i].isChecking = false
-                    self.updatableAddons[i].latestVersion = result.latestVersion
-                    self.updatableAddons[i].isUpdateAvailable = result.isUpdateAvailable
-                    self.updatableAddons[i].statusMessage = result.statusMessage
-                }
-            } catch {
-                self.log("[UpdateManager] Error checking \(addon.name): \(error.localizedDescription)")
-                if let i = self.updatableAddons.firstIndex(where: { $0.id == addonId }) {
-                    self.updatableAddons[i].isChecking = false
-                    self.updatableAddons[i].isUpdateAvailable = false
-                    self.updatableAddons[i].statusMessage = "Check failed"
-                }
+            if let i = updatableAddons.firstIndex(where: { $0.id == addonId }) {
+                updatableAddons[i].isChecking = false
+                updatableAddons[i].latestVersion = result.latestVersion
+                updatableAddons[i].isUpdateAvailable = result.isUpdateAvailable
+                updatableAddons[i].statusMessage = result.statusMessage
+            }
+        } catch {
+            log("[UpdateManager] Error checking \(addon.name): \(error.localizedDescription)")
+            if let i = updatableAddons.firstIndex(where: { $0.id == addonId }) {
+                updatableAddons[i].isChecking = false
+                updatableAddons[i].isUpdateAvailable = false
+                updatableAddons[i].statusMessage = "Check failed"
             }
         }
     }

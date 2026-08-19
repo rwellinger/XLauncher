@@ -178,3 +178,60 @@ struct PluginProfile: Identifiable, Codable, Hashable, Sendable {
         self.environmentVariables = try container.decodeIfPresent([ScriptEnvVar].self, forKey: .environmentVariables) ?? []
     }
 }
+
+// MARK: - Add-on Updates
+
+/// Which updater backend an add-on ships with.
+///
+/// Lives at file scope rather than nested in `UpdateManager` so the scan can run
+/// off the main actor: types nested in a `@MainActor` declaration inherit its
+/// isolation and could not cross an actor boundary.
+enum UpdaterType: String, Codable, Identifiable, Sendable {
+    case skunkcrafts = "SkunkCrafts"
+    case xUpdater = "X-Updater"
+    var id: String { rawValue }
+
+    var updater: any AddonUpdater {
+        switch self {
+        case .skunkcrafts:
+            return SkunkCraftsUpdaterService.shared
+        case .xUpdater:
+            return XUpdaterService.shared
+        }
+    }
+}
+
+enum AddonCategory: String, Codable, Identifiable, CaseIterable, Sendable {
+    case aircraft = "Aircraft"
+    case plugin = "Plugin"
+    case scenery = "Scenery"
+    case luaScript = "Lua Script"
+    var id: String { rawValue }
+
+    /// Where this category's source add-ons live inside the central data folder.
+    var dataSubfolder: DataSubfolder {
+        switch self {
+        case .aircraft: return .aircraft
+        case .plugin: return .plugins
+        case .scenery: return .scenery
+        case .luaScript: return .luaScripts
+        }
+    }
+}
+
+struct UpdatableAddon: Identifiable, Equatable, Hashable, Sendable {
+    let id = UUID()
+    let name: String
+    let addonCategory: AddonCategory
+    let folderName: String
+    let folderURL: URL
+    let updaterType: UpdaterType
+    let configFileURL: URL
+    var currentVersion: String?
+    var latestVersion: String?
+    var isUpdateAvailable: Bool = false
+    var isChecking: Bool = false
+    var isUpdating: Bool = false
+    var statusMessage: String = "Unknown"
+    var remoteManifestURL: String?
+}

@@ -42,20 +42,24 @@ final class SkunkCraftsUpdaterService: Sendable {
 
     // MARK: - Config Detection & Parsing
 
-    func findConfig(in folderURL: URL) -> URL? {
-        let skunkcraftsFiles = [
-            "skunkcrafts_updater.cfg",
-            "skunkcrafts_updater_beta.cfg",
-            "skunkcrafts_updater.json",
-            "skunkcrafts_updater_config.txt"
-        ]
-        for name in skunkcraftsFiles {
-            let url = folderURL.appendingPathComponent(name)
-            if fileManager.fileExists(atPath: url.path) {
-                return url
-            }
+    private let skunkcraftsFiles = [
+        "skunkcrafts_updater.cfg",
+        "skunkcrafts_updater_beta.cfg",
+        "skunkcrafts_updater.json",
+        "skunkcrafts_updater_config.txt"
+    ]
+
+    func matchConfig(in folderURL: URL, entries: Set<String>) -> URL? {
+        for name in skunkcraftsFiles where entries.contains(name) {
+            return folderURL.appendingPathComponent(name)
         }
         return nil
+    }
+
+    func findConfig(in folderURL: URL) -> URL? {
+        let entries = (try? fileManager.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: nil, options: []))?
+            .map(\.lastPathComponent) ?? []
+        return matchConfig(in: folderURL, entries: Set(entries))
     }
 
     func parseConfig(at url: URL, defaultName: String) -> SkunkCraftsConfig? {

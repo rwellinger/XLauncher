@@ -39,6 +39,7 @@ enum UserDefaultsKey: String, CaseIterable, Sendable {
     case enableCSLXP12Lights = "EnableCSLXP12Lights"
 
     // Addon Updates
+    case enableAddonUpdates = "EnableAddonUpdates"
     case autoCheckSkunkCraftsUpdates = "AutoCheckSkunkCraftsUpdates"
     case autoCheckXUpdaterUpdates = "AutoCheckXUpdaterUpdates"
     case autoCheckCSLUpdates = "AutoCheckCSLUpdates"

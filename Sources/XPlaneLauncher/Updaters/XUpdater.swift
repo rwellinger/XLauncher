@@ -112,17 +112,32 @@ final class XUpdaterService: Sendable {
         "client-configuration", "productid", "productId", "xupdignore", "description.txt"
     ]
 
-    func findConfig(in folderURL: URL) -> URL? {
-        for sub in nativeSubdirectories {
-            let searchDir = sub.isEmpty ? folderURL : folderURL.appendingPathComponent(sub)
-            for name in xUpdaterConfigFiles {
-                let fileURL = searchDir.appendingPathComponent(name)
-                if fileManager.fileExists(atPath: fileURL.path) {
-                    return fileURL
-                }
+    func matchConfig(in folderURL: URL, entries: Set<String>) -> URL? {
+        for name in xUpdaterConfigFiles where entries.contains(name) {
+            return folderURL.appendingPathComponent(name)
+        }
+
+        // Only descend into a native subdirectory that the listing says is
+        // actually there — probing all of them blindly is what made the scan
+        // expensive in the first place.
+        for sub in nativeSubdirectories where !sub.isEmpty && entries.contains(sub) {
+            let searchDir = folderURL.appendingPathComponent(sub)
+            guard let subEntries = try? fileManager.contentsOfDirectory(at: searchDir, includingPropertiesForKeys: nil, options: []) else {
+                continue
+            }
+            let subNames = Set(subEntries.map(\.lastPathComponent))
+            for name in xUpdaterConfigFiles where subNames.contains(name) {
+                return searchDir.appendingPathComponent(name)
             }
         }
+
         return nil
+    }
+
+    func findConfig(in folderURL: URL) -> URL? {
+        let entries = (try? fileManager.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: nil, options: []))?
+            .map(\.lastPathComponent) ?? []
+        return matchConfig(in: folderURL, entries: Set(entries))
     }
 
     private func formatVersionString(_ raw: String) -> String {
