@@ -1,5 +1,11 @@
 # X-Plane Launcher
 
+> **This is a fork.** It is based on
+> [jcorbier/x-plane-launcher](https://github.com/jcorbier/x-plane-launcher) and
+> carries changes that are not part of the original. It is not an official
+> release — for the upstream version, downloads, and support, please go to the
+> original repository.
+
 A native macOS manager and launcher for X-Plane 12.
 
 X-Plane Launcher lets you organize your add-ons in a central folder, create distinct profiles (e.g. VATSIM, airliner, general aviation), reorder scenery, keep add-ons updated, and launch X-Plane with the exact configuration you need.
@@ -22,15 +28,15 @@ X-Plane Launcher lets you organize your add-ons in a central folder, create dist
 
 ### Pre-built binaries
 
-Download the latest `XLauncher.dmg` from the [Releases](https://github.com/jcorbier/x-plane-launcher/releases) page and move `XLauncher.app` to your Applications folder.
+Download the latest `XLauncher.dmg` from the original project's [Releases](https://github.com/jcorbier/x-plane-launcher/releases) page and move `XLauncher.app` to your Applications folder. Those builds do **not** include this fork's changes — build from source for that.
 
 ### Building from source
 
 Requires Xcode or Swift command-line tools:
 
 ```bash
-git clone https://github.com/jcorbier/x-plane-launcher.git
-cd x-plane-launcher
+git clone https://github.com/rwellinger/XLauncher.git
+cd XLauncher
 ./package.sh
 ```
 
