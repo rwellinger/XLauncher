@@ -5,6 +5,8 @@ APP_NAME="XLauncher"
 SOURCE_NAME="XPlaneLauncher"
 BUILD_DIR=".build/release"
 APP_BUNDLE="${APP_NAME}.app"
+ICON_SOURCE="XLauncherIcon.png"
+ICON_FILE="${APP_NAME}.icns"
 SKIP_BUILD=false
 
 for arg in "$@"; do
@@ -54,12 +56,24 @@ if [ -f "$BUILD_DIR/$SOURCE_NAME" ]; then
     cp "$BUILD_DIR/$SOURCE_NAME" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 fi
 
+if [ ! -f "$ICON_FILE" ] || [ "$ICON_SOURCE" -nt "$ICON_FILE" ]; then
+    if [ -f "$ICON_SOURCE" ]; then
+        echo "Generating app icon..."
+        ./generate_icon.sh
+    fi
+fi
+
 echo "Copying resources..."
-if [ -f "XLauncher.icns" ]; then
-    cp "XLauncher.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+if [ -f "$ICON_FILE" ]; then
+    cp "$ICON_FILE" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+else
+    echo "Warning: $ICON_SOURCE not found, building without an app icon."
 fi
 
 echo "Signing app..."
 codesign -f -s - "$APP_BUNDLE"
+
+# Nudge the icon cache, otherwise Finder and Dock keep showing the generic icon.
+touch "$APP_BUNDLE"
 
 echo "Done! $APP_BUNDLE created."
