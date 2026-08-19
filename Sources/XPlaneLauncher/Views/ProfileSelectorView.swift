@@ -47,7 +47,7 @@ struct ProfileSelectorView: View {
                     }
                 }
                 .labelsHidden()
-                .frame(width: 180)
+                .frame(width: 300)
             }
 
             if pluginManager.selectedProfileId != nil && pluginManager.isCurrentProfileModified {
