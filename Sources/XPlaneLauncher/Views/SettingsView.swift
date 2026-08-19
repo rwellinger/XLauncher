@@ -117,6 +117,11 @@ struct SettingsView: View {
                                 Toggle("X-Plane Launcher application", isOn: $appUpdateManager.automaticallyCheckOnLaunch)
                                     .font(.body)
 
+                                Label("This build is a fork. Releases come from the upstream project and do not contain this fork's changes — installing one replaces this build.", systemImage: "exclamationmark.triangle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                                    .padding(.leading, 20)
+
                                 Toggle("Manage add-on updates", isOn: $updateManager.enableAddonUpdates)
                                     .font(.body)
 

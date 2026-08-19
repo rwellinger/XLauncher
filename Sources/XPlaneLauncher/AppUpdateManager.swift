@@ -218,11 +218,10 @@ final class AppUpdateManager {
     }
 
     init() {
-        if defaults.object(forKey: .appUpdateAutoCheckOnLaunch) == nil {
-            self.automaticallyCheckOnLaunch = true
-        } else {
-            self.automaticallyCheckOnLaunch = defaults.bool(forKey: .appUpdateAutoCheckOnLaunch)
-        }
+        // Off by default in this fork: the releases this checks live in the
+        // upstream repository and do not carry the changes made here, so
+        // installing one would silently roll the user back.
+        self.automaticallyCheckOnLaunch = defaults.bool(forKey: .appUpdateAutoCheckOnLaunch)
 
         self.includePrereleases = defaults.bool(forKey: .appUpdateIncludePrereleases)
         self.skippedVersion = defaults.string(forKey: .appUpdateSkippedVersion)
