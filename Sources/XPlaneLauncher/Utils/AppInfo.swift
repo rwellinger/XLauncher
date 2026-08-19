@@ -36,10 +36,15 @@ enum AppInfo {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
     }
 
+    /// Placeholder written by `package.sh`; only the release workflow stamps a
+    /// real version. A locally built fork therefore has no meaningful version
+    /// number to show.
+    private static let unversionedPlaceholder = "0.0.0"
+
     static var displayVersion: String {
         let ver = version.trimmingCharacters(in: .whitespacesAndNewlines)
-        if ver.isEmpty {
-            return "Development Build"
+        if ver.isEmpty || ver == unversionedPlaceholder {
+            return "FORK"
         }
         let build = buildNumber.trimmingCharacters(in: .whitespacesAndNewlines)
         if !build.isEmpty && build != ver {

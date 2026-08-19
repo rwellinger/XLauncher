@@ -117,11 +117,6 @@ struct SettingsView: View {
                                 Toggle("X-Plane Launcher application", isOn: $appUpdateManager.automaticallyCheckOnLaunch)
                                     .font(.body)
 
-                                Label("This build is a fork. Releases come from the upstream project and do not contain this fork's changes — installing one replaces this build.", systemImage: "exclamationmark.triangle.fill")
-                                    .font(.caption)
-                                    .foregroundStyle(.orange)
-                                    .padding(.leading, 20)
-
                                 Toggle("Manage add-on updates", isOn: $updateManager.enableAddonUpdates)
                                     .font(.body)
 
@@ -151,6 +146,19 @@ struct SettingsView: View {
 
                     GroupBox("Application Updates") {
                         VStack(alignment: .leading, spacing: 12) {
+                            HStack(alignment: .top, spacing: 6) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.orange)
+                                Text("This build is a fork. These releases come from the upstream project and do not contain this fork's changes — downloading one replaces this build.")
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .padding(8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.orange.opacity(0.10))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+
                             Toggle("Include pre-release and beta versions", isOn: $appUpdateManager.includePrereleases)
                                 .font(.body)
                                 .onChange(of: appUpdateManager.includePrereleases) { _, _ in
@@ -173,6 +181,17 @@ struct SettingsView: View {
                                             Text(appUpdateManager.statusMessage)
                                                 .font(.subheadline)
                                                 .fontWeight(.semibold)
+                                        } else if appUpdateManager.lastCheckDate == nil {
+                                            // Never checked, and nothing will check on its own.
+                                            // A green tick here would claim "up to date" without
+                                            // anyone having looked.
+                                            Image(systemName: "pause.circle.fill")
+                                                .foregroundStyle(.secondary)
+                                            Text(appUpdateManager.automaticallyCheckOnLaunch
+                                                 ? appUpdateManager.statusMessage
+                                                 : "Automatic checks are off — use Check Now to look")
+                                                .font(.subheadline)
+                                                .foregroundStyle(.secondary)
                                         } else {
                                             Image(systemName: "checkmark.circle.fill")
                                                 .foregroundStyle(.green)
