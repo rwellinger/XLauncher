@@ -26,6 +26,8 @@ struct ProfileSelectorView: View {
     @Environment(PluginManager.self) var pluginManager
     @State private var showingSaveProfileAlert = false
     @State private var newProfileName = ""
+    @State private var showingRenameProfileAlert = false
+    @State private var renameProfileName = ""
 
     var body: some View {
         @Bindable var pluginManager = pluginManager
@@ -89,6 +91,16 @@ struct ProfileSelectorView: View {
                 .help("Save current selection as a new profile")
 
                 Button(action: {
+                    renameProfileName = pluginManager.profiles
+                        .first(where: { $0.id == pluginManager.selectedProfileId })?.name ?? ""
+                    showingRenameProfileAlert = true
+                }) {
+                    Image(systemName: "pencil")
+                }
+                .disabled(pluginManager.selectedProfileId == nil)
+                .help("Rename selected profile")
+
+                Button(action: {
                     if let selectedId = pluginManager.selectedProfileId,
                        let profile = pluginManager.profiles.first(where: { $0.id == selectedId }) {
                         pluginManager.deleteProfile(profile)
@@ -118,6 +130,18 @@ struct ProfileSelectorView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Enter a name for this configuration.")
+        }
+        .alert("Rename Profile", isPresented: $showingRenameProfileAlert) {
+            TextField("Profile Name", text: $renameProfileName)
+            Button("Rename") {
+                if let selectedId = pluginManager.selectedProfileId,
+                   let profile = pluginManager.profiles.first(where: { $0.id == selectedId }) {
+                    pluginManager.renameProfile(profile, to: renameProfileName)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Enter a new name for this profile.")
         }
     }
 }

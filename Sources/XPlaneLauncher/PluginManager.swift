@@ -836,6 +836,15 @@ class PluginManager {
         profileService.saveProfiles(profiles)
     }
 
+    func renameProfile(_ profile: PluginProfile, to newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let index = profiles.firstIndex(where: { $0.id == profile.id }) else { return }
+
+        profiles[index].name = trimmed
+        profileService.saveProfiles(profiles)
+    }
+
     func duplicateProfile(_ profile: PluginProfile) {
         let copy = profileService.duplicateProfile(profile)
         profiles.append(copy)
