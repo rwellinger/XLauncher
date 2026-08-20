@@ -24,26 +24,57 @@ import SwiftUI
 
 struct LaunchButton: View {
     @Environment(PluginManager.self) var pluginManager
+    @Environment(SystemReadinessManager.self) var readiness
+
+    private var isBlocked: Bool {
+        pluginManager.xPlanePath == nil || readiness.blocksLaunch
+    }
 
     var body: some View {
-        Button(action: {
-            pluginManager.launchXPlane()
-        }) {
-            HStack {
-                Image(systemName: "airplane")
-                    .rotationEffect(.degrees(-45))
-                Text("Launch X-Plane")
-                    .fontWeight(.semibold)
+        VStack(spacing: 6) {
+            Button(action: {
+                pluginManager.launchXPlane()
+            }) {
+                HStack {
+                    Image(systemName: "airplane")
+                        .rotationEffect(.degrees(-45))
+                    Text("Launch X-Plane")
+                        .fontWeight(.semibold)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.blue.gradient)
+                .foregroundColor(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(color: .blue.opacity(0.3), radius: 5, x: 0, y: 3)
             }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color.blue.gradient)
-            .foregroundColor(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .blue.opacity(0.3), radius: 5, x: 0, y: 3)
+            .buttonStyle(.plain) // Important for custom styling in SwiftUI macOS
+            .disabled(isBlocked)
+            .opacity(isBlocked ? 0.6 : 1.0)
+            .help(readiness.blocksLaunch ? readiness.reason : "")
+
+            if readiness.blockLaunchOnHighLoad {
+                Label(readiness.reason, systemImage: readiness.isReady ? "checkmark.circle" : "hourglass")
+                    .font(.caption)
+                    .foregroundStyle(readiness.isReady ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.orange))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                // Never lock the user out: the readiness check is advisory only.
+                if readiness.blocksLaunch && pluginManager.xPlanePath != nil {
+                    Button("Launch Anyway") {
+                        pluginManager.launchXPlane()
+                    }
+                    .buttonStyle(.link)
+                    .font(.caption)
+                }
+            }
         }
-        .buttonStyle(.plain) // Important for custom styling in SwiftUI macOS
-        .disabled(pluginManager.xPlanePath == nil)
-        .opacity(pluginManager.xPlanePath == nil ? 0.6 : 1.0)
+        .task {
+            readiness.startMonitoring()
+        }
+        .onDisappear {
+            readiness.stopMonitoring()
+        }
     }
 }

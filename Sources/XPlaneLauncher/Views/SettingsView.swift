@@ -27,6 +27,7 @@ struct SettingsView: View {
     @Environment(AppUpdateManager.self) var appUpdateManager
     @Environment(CSLManager.self) var cslManager
     @Environment(UpdateManager.self) var updateManager
+    @Environment(SystemReadinessManager.self) var readinessManager
     @State private var selectedEnvVarId: PluginManager.ScriptEnvVar.ID?
     @State private var showWelcomeSheet: Bool = false
     @State private var showReleaseNotesSheet: Bool = false
@@ -44,6 +45,7 @@ struct SettingsView: View {
         @Bindable var appUpdateManager = appUpdateManager
         @Bindable var cslManager = cslManager
         @Bindable var updateManager = updateManager
+        @Bindable var readinessManager = readinessManager
 
         VStack(spacing: 0) {
             // Header Bar
@@ -104,6 +106,20 @@ struct SettingsView: View {
                                 }
                             }
                         }
+                        .padding(8)
+                    }
+
+                    GroupBox("Launch") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Toggle("Block launch while the system is under heavy load", isOn: $readinessManager.blockLaunchOnHighLoad)
+                                .font(.body)
+
+                            Text("Right after a boot, Spotlight indexing, iCloud sync and background Shortcuts keep the machine busy and X-Plane takes far longer to start. While the one-minute load average stays high, the launch button is disabled — a \u{201C}Launch Anyway\u{201D} override is always offered.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.leading, 20)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(8)
                     }
 

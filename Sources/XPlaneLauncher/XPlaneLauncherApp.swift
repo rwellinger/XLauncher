@@ -29,6 +29,7 @@ struct XPlaneLauncherApp: App {
     @State private var updateManager = UpdateManager()
     @State private var cslManager = CSLManager()
     @State private var appUpdateManager = AppUpdateManager()
+    @State private var readinessManager = SystemReadinessManager()
     @State private var showWelcomeScreen = false
 
     var body: some Scene {
@@ -38,6 +39,7 @@ struct XPlaneLauncherApp: App {
                 .environment(updateManager)
                 .environment(cslManager)
                 .environment(appUpdateManager)
+                .environment(readinessManager)
                 .frame(minWidth: 600, minHeight: 500)
                 .onAppear {
                     updateManager.launcherDataFolder = pluginManager.launcherDataFolder

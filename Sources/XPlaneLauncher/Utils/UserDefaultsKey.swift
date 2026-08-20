@@ -38,6 +38,7 @@ enum UserDefaultsKey: String, CaseIterable, Sendable {
     // Feature Flags & CSL
     case enableCSLSupport = "EnableCSLSupport"
     case enableCSLXP12Lights = "EnableCSLXP12Lights"
+    case blockLaunchOnHighLoad = "BlockLaunchOnHighLoad"
 
     // Addon Updates
     case enableAddonUpdates = "EnableAddonUpdates"
