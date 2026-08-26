@@ -28,7 +28,7 @@ X-Plane Launcher lets you organize your add-ons in a central folder, create dist
 
 ## Requirements
 
-- macOS 15.6 or later
+- macOS 14.0 (Sonoma) or later
 - X-Plane 12
 
 ## Installation
