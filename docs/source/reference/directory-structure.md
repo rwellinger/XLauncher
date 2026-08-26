@@ -21,6 +21,21 @@ XPlaneLauncher/
 └── LuaScripts/     # Source FlyWithLua scripts and bundles
 ```
 
+Aircraft may additionally be sorted into grouping folders one level deep. A folder holding
+no `.acf` file of its own, but containing folders that do, is treated as a group whose
+aircraft are managed individually:
+
+```text
+Aircraft/
+├── Zibo 737-800X/
+└── Heli/
+    ├── AW109SP/
+    └── EC135/
+```
+
+This applies to aircraft only — plugins, scenery, and Lua scripts must sit directly in
+their subdirectory.
+
 ---
 
 ## Symlink Mappings
@@ -30,6 +45,7 @@ When a profile is activated, X-Plane Launcher creates symbolic links inside the 
 | Category | Source Path in Central Folder | Target Path in X-Plane 12 |
 | :--- | :--- | :--- |
 | **Aircraft** | `Aircraft/<Folder>` | `<X-Plane 12>/Aircraft/<Folder>` |
+| **Grouped aircraft** | `Aircraft/<Group>/<Folder>` | `<X-Plane 12>/Aircraft/<Group>/<Folder>` (`<Group>` is a real directory, created and removed with its links) |
 | **Plugins** | `Plugins/<Folder>` | `<X-Plane 12>/Resources/plugins/<Folder>` |
 | **Scenery** | `Scenery/<Folder>` | `<X-Plane 12>/Custom Scenery/<Folder>` |
 | **Lua Script** | `LuaScripts/<Script>.lua` | `<X-Plane 12>/Resources/plugins/FlyWithLua/Scripts/<Script>.lua` |

@@ -2,6 +2,13 @@
 
 **X-Plane Launcher** (XLauncher) is a native macOS manager and profile-based launcher for **X-Plane 12**.
 
+:::{note}
+This documentation covers a **fork** of
+[jcorbier/x-plane-launcher](https://github.com/jcorbier/x-plane-launcher). It carries
+changes that are not part of the original, and in-app self-updating is disabled — see
+[Installation](getting-started/installation.md).
+:::
+
 It organizes add-ons in a central folder and creates symbolic links into your X-Plane installation based on your selected profile. This allows you to switch between configurations—such as online airliner flying, offline bush trips, or testing—without moving large folders or duplicating files.
 
 ```{image} https://img.shields.io/badge/platform-macOS%2014.0%2B-blue
@@ -25,6 +32,10 @@ Save and switch configurations across aircraft, plugins, scenery packs, and FlyW
 
 :::{grid-item-card} Symlink Management
 Keep your X-Plane directory tidy. Add-ons remain in a central directory and are linked into X-Plane on demand.
+:::
+
+:::{grid-item-card} Aircraft Grouping
+Sort your fleet into subfolders. Each aircraft is still enabled individually, and the grouping is mirrored into your X-Plane installation.
 :::
 
 :::{grid-item-card} Scenery Ordering & Groups

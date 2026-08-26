@@ -17,11 +17,18 @@ This page details the options available in the **Settings** view.
 
 ---
 
+## Launch
+
+- **Block launch while the system is under heavy load**: Right after a boot, Spotlight indexing, iCloud sync, and background Shortcuts keep the machine busy, and X-Plane takes far longer to start. While the one-minute load average stays high, the launch button is disabled. A **Launch Anyway** override is always offered, so this never blocks you outright.
+
+---
+
 ## Automatic Updates
 
 Configure which components automatically check for new versions and updates when X-Plane Launcher starts:
 
-- **X-Plane Launcher application**: When enabled, checks GitHub for new application versions on startup.
+- **X-Plane Launcher application**: When enabled, checks GitHub for new application versions on startup. Off by default in this fork, because the releases it finds are the original project's and do not carry this fork's changes.
+- **Manage add-on updates**: Master switch for the whole add-on updater. When disabled, no scan of the Central Data Folder runs at all and the **Updates** tab disappears from the sidebar.
 - **SkunkCrafts add-ons**: When enabled, queries remote servers for updates to SkunkCrafts-managed add-ons on startup.
 - **X-Updater add-ons**: When enabled, queries remote servers for updates to X-Updater-managed add-ons on startup.
 - **X-CSL models**: When enabled, synchronizes the package index and checks for model updates from the X-CSL repository on startup (available when X-CSL support is enabled).
@@ -35,9 +42,16 @@ Disabling automatic checks on launch does not prevent manual checks. You can sti
 
 ## Application Updates
 
+:::{note}
+In-app updating is disabled in this fork. The update feed belongs to the original
+project, so installing from it would replace your build with the upstream version.
+Update by pulling the repository and running `./package.sh` again — see
+[Installation](../getting-started/installation.md).
+:::
+
 - **Include pre-release and beta versions**: When enabled, checks for pre-release and beta builds on GitHub in addition to stable releases.
-- **Check Now**: Manually checks GitHub for application updates immediately.
-- **What's New / Update & Relaunch**: View version release notes and changelogs, or update and relaunch the application in-place directly from the UI (with a manual `.dmg` download option available as a fallback).
+- **Check Now**: Manually checks GitHub for application updates immediately. This reports what the original project has published; it does not install anything.
+- **What's New**: View version release notes and changelogs.
 
 ---
 

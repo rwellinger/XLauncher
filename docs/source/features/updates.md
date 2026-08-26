@@ -4,6 +4,13 @@ X-Plane Launcher includes a built-in updater that scans your Central Data Folder
 
 ---
 
+## Enabling the Updater
+
+The whole feature sits behind **Manage add-on updates** in **Settings**. When it is off, no
+scan of the Central Data Folder runs at all and the **Updates** tab is hidden.
+
+---
+
 ## Supported Updaters
 
 - **SkunkCrafts Updater**: Detects `skunkcrafts_updater.cfg` or `skunkcrafts_updater.ini` configuration files.
@@ -21,7 +28,7 @@ Navigate to the **Updates** tab:
 ```
 
 ### Features:
-- **Scan**: Automatically scans up to two directory levels deep inside `Aircraft`, `Plugins`, `Scenery`, and `LuaScripts`.
+- **Scan**: Automatically scans up to five directory levels deep inside `Aircraft`, `Plugins`, `Scenery`, and `LuaScripts`. The scan runs off the main thread, so it never blocks the interface, and reads each directory exactly once.
 - **Check for Updates**: Queries remote manifest servers for version comparisons.
 - **Update Individual Add-ons**: Click **Update** next to any add-on with an available update.
 - **Update All**: Downloads and applies all available updates in sequence.
