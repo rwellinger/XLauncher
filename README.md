@@ -5,6 +5,10 @@
 > carries changes that are not part of the original. It is not an official
 > release — for the upstream version, downloads, and support, please go to the
 > original repository.
+>
+> In-app self-updating is **disabled** in this fork. The upstream update feed
+> serves builds without these changes, so installing from it would roll you back.
+> Update by pulling this repository and running `./package.sh` again.
 
 A native macOS manager and launcher for X-Plane 12.
 
@@ -14,10 +18,10 @@ X-Plane Launcher lets you organize your add-ons in a central folder, create dist
 
 - **Profiles**: Save and switch configurations across aircraft, plugins, scenery packs, and FlyWithLua scripts.
 - **Clean symlink management**: Keep your X-Plane directory tidy. Add-ons stay in a central folder and are symlinked into X-Plane on demand.
+- **Aircraft grouping**: Organize your fleet in subfolders (e.g. `Aircraft/Heli/AW109SP`). Each aircraft is still enabled and disabled individually, and the grouping is mirrored into your X-Plane installation.
 - **Scenery pack ordering & grouping**: Reorder `scenery_packs.ini` with drag-and-drop, enable or disable packs without deleting files, and organize scenery into groups.
 - **Smart add-on installer & deletion**: Drag and drop `.zip` archives, folders, or `.lua` scripts to install add-ons, or delete them directly from the UI with automated profile cleanup and unlinking.
 - **Add-on updates**: Check and install updates for add-ons supported by SkunkCrafts Updater or X-Updater directly from the UI.
-- **In-app self-updates**: Check for new versions, review release notes, and install updates in-place with automatic restart.
 - **Navigation data updates**: Download and update AIRAC cycles directly from Navigraph for X-Plane 12 and supported aircrafts.
 - **CSL packages & lights**: Manage CSL model matching packages, apply lighting intensity presets (high/medium/low), or restore original lights.
 - **Pre-launch scripts**: Run custom shell scripts with profile-specific environment variables before starting X-Plane (e.g. setting up Hoppie ACARS).
@@ -61,6 +65,16 @@ Store your add-ons in their respective subdirectories inside the central folder:
 ├── Plugins/    <-- Source plugins
 ├── Scenery/    <-- Source scenery packs
 └── LuaScripts/ <-- Source FlyWithLua scripts
+```
+
+Aircraft may be grouped one level deep; plugins, scenery, and scripts may not:
+
+```text
+Aircraft/
+├── B738/           <-- managed on its own
+└── Heli/           <-- a grouping folder
+    ├── AW109SP/    <-- each managed on its own
+    └── EC135/
 ```
 
 When applying a profile, the launcher creates symlinks in:
