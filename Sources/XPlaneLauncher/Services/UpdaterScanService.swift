@@ -57,7 +57,7 @@ final class UpdaterScanService: Sendable {
     func scanUpdatableAddons(in dataFolder: URL) -> [UpdatableAddon] {
         var results: [UpdatableAddon] = []
 
-        for category in AddonCategory.allCases {
+        for category in UpdatableAddonCategory.allCases {
             if Task.isCancelled { return [] }
 
             let folderURL = pathService.dataFolder(category.dataSubfolder, in: dataFolder)
@@ -69,7 +69,7 @@ final class UpdaterScanService: Sendable {
         return results
     }
 
-    private func scanDirectory(_ folderURL: URL, category: AddonCategory, depth: Int) -> [UpdatableAddon] {
+    private func scanDirectory(_ folderURL: URL, category: UpdatableAddonCategory, depth: Int) -> [UpdatableAddon] {
         guard depth <= maxDepth, !Task.isCancelled else { return [] }
 
         guard let contents = try? fileManager.contentsOfDirectory(

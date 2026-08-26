@@ -72,7 +72,7 @@ class UpdateManager {
     }
 
     var updatableAddons: [UpdatableAddon] = []
-    let logger = ConsoleLogger()
+    var logger: ConsoleLogger { ConsoleLogger.shared }
 
     var isCheckingUpdates: Bool {
         updatableAddons.contains { $0.isChecking }
@@ -86,17 +86,17 @@ class UpdateManager {
         updatableAddons.contains { $0.isChecking || $0.isUpdating }
     }
 
-    func log(_ message: String) {
-        logger.log(message)
+    func log(_ message: String, level: LogLevel = .info) {
+        ConsoleLogger.shared.log(message, category: .updates, level: level)
     }
 
     func clearLogs() {
-        logger.clear()
+        ConsoleLogger.shared.clear(category: .updates)
     }
 
     // Model typealiases for view compatibility
     typealias UpdaterType = XPlaneLauncher.UpdaterType
-    typealias AddonCategory = XPlaneLauncher.AddonCategory
+    typealias AddonCategory = XPlaneLauncher.UpdatableAddonCategory
     typealias UpdatableAddon = XPlaneLauncher.UpdatableAddon
 
     init(launcherDataFolder: URL? = nil) {
@@ -283,7 +283,7 @@ class UpdateManager {
                     self.updatableAddons[i].statusMessage = "Up to date"
                 }
             } catch {
-                self.log("[UpdateManager] Update failed for \(addon.name): \(error.localizedDescription)")
+                self.log("Update failed for \(addon.name): \(error.localizedDescription)", level: .error)
                 if let i = self.updatableAddons.firstIndex(where: { $0.id == addonId }) {
                     self.updatableAddons[i].isUpdating = false
                     self.updatableAddons[i].statusMessage = "Update failed: \(error.localizedDescription)"

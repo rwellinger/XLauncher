@@ -57,6 +57,17 @@ final class SceneryService: Sendable {
         managedSceneryFolder: URL?,
         iniURL: URL?
     ) throws -> [Scenery] {
+        // Ensure managed scenery packs are linked in Custom Scenery
+        if let managedURL = managedSceneryFolder, fileManager.fileExists(atPath: managedURL.path) {
+            if let contents = try? fileManager.contentsOfDirectory(at: managedURL, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) {
+                for url in contents {
+                    if isDirectoryOrLink(at: url) {
+                        try? linkScenery(folderName: url.lastPathComponent, managedSceneryFolder: managedURL, customSceneryFolder: customSceneryFolder)
+                    }
+                }
+            }
+        }
+
         // 1. Read scenery_packs.ini to establish order
         var iniItems: [(line: String, folderName: String, enabled: Bool)] = []
         var foundFolderNames: Set<String> = []
@@ -95,7 +106,6 @@ final class SceneryService: Sendable {
                             isEnabled: true,
                             folderName: name,
                             isManaged: isSymlink(at: url),
-                            isInIni: false,
                             iniLine: "SCENERY_PACK Custom Scenery/\(name)/"
                         ))
                     }
@@ -103,33 +113,7 @@ final class SceneryService: Sendable {
             }
         }
 
-        // 3. Scan managed Scenery folder for uninstalled items
-        var uninstalled: [Scenery] = []
-        if let managedURL = managedSceneryFolder, fileManager.fileExists(atPath: managedURL.path) {
-            let contents = try fileManager.contentsOfDirectory(at: managedURL, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
-            for url in contents {
-                if isDirectoryOrLink(at: url) {
-                    let name = url.lastPathComponent
-                    // Installed means "Custom Scenery has an entry for it". Being listed in
-                    // the INI is not enough: the entry may have been removed, in which case
-                    // the package still has to show up as available from the data folder.
-                    let isInstalled = entryExists(at: customSceneryFolder.appendingPathComponent(name))
-
-                    if !isInstalled {
-                        uninstalled.append(Scenery(
-                            name: name,
-                            isEnabled: false,
-                            folderName: name,
-                            isManaged: true,
-                            isInIni: false,
-                            iniLine: ""
-                        ))
-                    }
-                }
-            }
-        }
-
-        // 4. Construct final list
+        // 3. Construct final list
         var finalScenery: [Scenery] = []
         finalScenery.append(contentsOf: installedButNotInIni.sorted { $0.name < $1.name })
 
@@ -143,13 +127,11 @@ final class SceneryService: Sendable {
                     isEnabled: item.enabled,
                     folderName: item.folderName,
                     isManaged: !isSpecialIdx && isSymlink(at: path),
-                    isInIni: true,
                     iniLine: item.line
                 ))
             }
         }
 
-        finalScenery.append(contentsOf: uninstalled.sorted { $0.name < $1.name })
         return finalScenery
     }
 
@@ -177,12 +159,17 @@ final class SceneryService: Sendable {
             }
         }
 
+        guard PathSecurity.isStrictlyContained(url: iniURL, within: customSceneryFolder) else {
+            throw AppError.pathNotFound(iniURL.path)
+        }
+
         try content.write(to: iniURL, atomically: true, encoding: .utf8)
     }
 
     func linkScenery(folderName: String, managedSceneryFolder: URL, customSceneryFolder: URL) throws {
-        let linkURL = customSceneryFolder.appendingPathComponent(folderName)
-        let sourceURL = managedSceneryFolder.appendingPathComponent(folderName)
+        let cleanName = try PathSecurity.sanitizePathComponent(folderName)
+        let linkURL = try PathSecurity.validateSubpath(relativePath: cleanName, within: customSceneryFolder)
+        let sourceURL = try PathSecurity.validateSubpath(relativePath: cleanName, within: managedSceneryFolder)
 
         guard fileManager.fileExists(atPath: sourceURL.path) else {
             throw AppError.pathNotFound(sourceURL.path)
@@ -200,7 +187,8 @@ final class SceneryService: Sendable {
     }
 
     func unlinkScenery(folderName: String, customSceneryFolder: URL) throws {
-        let linkURL = customSceneryFolder.appendingPathComponent(folderName)
+        let cleanName = try PathSecurity.sanitizePathComponent(folderName)
+        let linkURL = try PathSecurity.validateSubpath(relativePath: cleanName, within: customSceneryFolder)
         // Only ever remove the link itself, never a real scenery directory.
         // `isSymlink` also matches stale links, which `fileExists` would miss.
         if isSymlink(at: linkURL) {

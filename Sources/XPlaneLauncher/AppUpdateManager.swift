@@ -23,6 +23,7 @@
 import Foundation
 import Observation
 import AppKit
+import Sparkle
 
 // MARK: - Semantic Version
 
@@ -42,6 +43,10 @@ public struct SemanticVersion: Comparable, Hashable, Sendable, CustomStringConve
         (major == 0 && minor == 0 && patch == 0) ||
         rawString.localizedCaseInsensitiveContains("draft") ||
         rawString.localizedCaseInsensitiveContains("dev")
+    }
+
+    public var isPrerelease: Bool {
+        prerelease != nil
     }
 
     public init?(string: String) {
@@ -178,13 +183,17 @@ public struct AppRelease: Codable, Identifiable, Hashable, Sendable {
     public var dmgAsset: AppReleaseAsset? {
         assets.first { $0.name.lowercased().hasSuffix(".dmg") }
     }
+
+    public var zipAsset: AppReleaseAsset? {
+        assets.first { $0.name.lowercased().hasSuffix(".zip") }
+    }
 }
 
 // MARK: - App Update Manager
 
 @MainActor
 @Observable
-final class AppUpdateManager {
+final class AppUpdateManager: NSObject {
     private let defaults = UserDefaults.standard
 
     var isChecking: Bool = false
@@ -194,6 +203,15 @@ final class AppUpdateManager {
     var lastCheckDate: Date? = nil
     var lastErrorMessage: String? = nil
     var statusMessage: String = "Not checked yet"
+
+    // Sparkle In-App Update State
+    var isSparkleUpdating: Bool = false
+    var sparkleDownloadProgress: Double = 0.0
+    var sparkleStatus: String = ""
+    var sparkleErrorMessage: String? = nil
+
+    private var sparkleDriver: SparkleCustomUserDriver?
+    private var sparkleUpdater: SPUUpdater?
 
     var automaticallyCheckOnLaunch: Bool {
         didSet {
@@ -217,7 +235,7 @@ final class AppUpdateManager {
         }
     }
 
-    init() {
+    override init() {
         // Off by default in this fork: the releases this checks live in the
         // upstream repository and do not carry the changes made here, so
         // installing one would silently roll the user back.
@@ -228,6 +246,28 @@ final class AppUpdateManager {
 
         if let savedDate = defaults.object(forKey: .appUpdateLastCheckDate) as? Date {
             self.lastCheckDate = savedDate
+        }
+
+        super.init()
+        setupSparkle()
+    }
+
+    private func setupSparkle() {
+        let driver = SparkleCustomUserDriver(updateManager: self)
+        self.sparkleDriver = driver
+
+        let updater = SPUUpdater(
+            hostBundle: Bundle.main,
+            applicationBundle: Bundle.main,
+            userDriver: driver,
+            delegate: self
+        )
+        self.sparkleUpdater = updater
+
+        do {
+            try updater.start()
+        } catch {
+            ConsoleLogger.shared.log("Failed to start Sparkle updater: \(error.localizedDescription)", category: .updates, level: .warn)
         }
     }
 
@@ -397,5 +437,43 @@ final class AppUpdateManager {
         } else {
             NSWorkspace.shared.open(AppInfo.releasesURL)
         }
+    }
+
+    func startInAppUpdate() {
+        guard let updater = sparkleUpdater else {
+            downloadLatestDMG()
+            return
+        }
+        isSparkleUpdating = true
+        sparkleErrorMessage = nil
+        sparkleStatus = "Starting update..."
+        sparkleDriver?.proceedWithInstall()
+        updater.checkForUpdates()
+    }
+
+    func cancelInAppUpdate() {
+        sparkleDriver?.cancelDownload()
+        isSparkleUpdating = false
+        sparkleDownloadProgress = 0.0
+        sparkleStatus = ""
+    }
+}
+
+// MARK: - SPUUpdaterDelegate
+
+extension AppUpdateManager: SPUUpdaterDelegate {
+    /// No feed in this fork. The appcast this would point at is published from the
+    /// upstream repository and does not carry the changes made here, so letting
+    /// Sparkle install from it would silently roll the user back. Point this at a
+    /// fork-owned appcast before enabling in-app updates again.
+    func feedURLString(for updater: SPUUpdater) -> String? {
+        nil
+    }
+
+    func allowedChannels(for updater: SPUUpdater) -> Set<String> {
+        if includePrereleases {
+            return ["beta", "prerelease"]
+        }
+        return []
     }
 }

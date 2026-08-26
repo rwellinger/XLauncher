@@ -31,8 +31,16 @@ Keep your X-Plane directory tidy. Add-ons remain in a central directory and are 
 Reorder `scenery_packs.ini` with drag-and-drop, group related scenery entries, and toggle packages without moving files.
 :::
 
+:::{grid-item-card} Add-on Installer & Deletion
+Install packages with drag-and-drop, and cleanly delete unwanted add-ons with automated profile and symlink cleanup.
+:::
+
 :::{grid-item-card} Add-on Updates
 Check and install updates for add-ons that use SkunkCrafts Updater or X-Updater directly from the application.
+:::
+
+:::{grid-item-card} Navigation Data (Navigraph)
+Download and update AIRAC cycles directly from Navigraph for X-Plane and supported aircrafts.
 :::
 
 :::{grid-item-card} CSL Packages & Lights
@@ -97,7 +105,9 @@ user-guide/pre-launch-scripts
 :maxdepth: 2
 :caption: Advanced Features
 
+features/addon-installer
 features/updates
+features/navdata
 features/csl-models
 ```
 

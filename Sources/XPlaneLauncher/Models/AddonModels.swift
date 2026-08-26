@@ -79,20 +79,18 @@ struct Scenery: Identifiable, Equatable, Hashable, Sendable {
     var isEnabled: Bool
     var folderName: String
     var isManaged: Bool
-    var isInIni: Bool
     var iniLine: String
 
     var isToggleable: Bool {
         !folderName.hasPrefix("*")
     }
 
-    init(id: UUID = UUID(), name: String, isEnabled: Bool, folderName: String, isManaged: Bool, isInIni: Bool, iniLine: String) {
+    init(id: UUID = UUID(), name: String, isEnabled: Bool, folderName: String, isManaged: Bool, iniLine: String = "") {
         self.id = id
         self.name = name
         self.isEnabled = isEnabled
         self.folderName = folderName
         self.isManaged = isManaged
-        self.isInIni = isInIni
         self.iniLine = iniLine
     }
 }
@@ -208,7 +206,9 @@ enum UpdaterType: String, Codable, Identifiable, Sendable {
     }
 }
 
-enum AddonCategory: String, Codable, Identifiable, CaseIterable, Sendable {
+/// The add-on kinds the updater backends know about. Distinct from the
+/// installer's `AddonCategory`, whose cases mirror X-Plane's folder names.
+enum UpdatableAddonCategory: String, Codable, Identifiable, CaseIterable, Sendable {
     case aircraft = "Aircraft"
     case plugin = "Plugin"
     case scenery = "Scenery"
@@ -229,7 +229,7 @@ enum AddonCategory: String, Codable, Identifiable, CaseIterable, Sendable {
 struct UpdatableAddon: Identifiable, Equatable, Hashable, Sendable {
     let id = UUID()
     let name: String
-    let addonCategory: AddonCategory
+    let addonCategory: UpdatableAddonCategory
     let folderName: String
     let folderURL: URL
     let updaterType: UpdaterType

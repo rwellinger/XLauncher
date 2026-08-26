@@ -35,16 +35,21 @@ enum UserDefaultsKey: String, CaseIterable, Sendable {
     case sceneryGroups = "SceneryGroups"
     case expandedAircraftGroups = "ExpandedAircraftGroups"
 
-    // Feature Flags & CSL
+    // Feature Flags & CSL / Navdata
     case enableCSLSupport = "EnableCSLSupport"
     case enableCSLXP12Lights = "EnableCSLXP12Lights"
     case blockLaunchOnHighLoad = "BlockLaunchOnHighLoad"
+    case enableNavdataSupport = "EnableNavdataSupport"
+    case customNavdataAddonMappings = "CustomNavdataAddonMappings"
+    case navigraphSession = "NavigraphSession"
+    case navigraphSavedEmail = "NavigraphSavedEmail"
 
     // Addon Updates
     case enableAddonUpdates = "EnableAddonUpdates"
     case autoCheckSkunkCraftsUpdates = "AutoCheckSkunkCraftsUpdates"
     case autoCheckXUpdaterUpdates = "AutoCheckXUpdaterUpdates"
     case autoCheckCSLUpdates = "AutoCheckCSLUpdates"
+    case autoCheckNavdataUpdates = "AutoCheckNavdataUpdates"
 
     // App Updates
     case appUpdateAutoCheckOnLaunch = "AppUpdateAutoCheckOnLaunch"

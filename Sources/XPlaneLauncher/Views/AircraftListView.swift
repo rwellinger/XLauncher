@@ -24,6 +24,7 @@ import SwiftUI
 
 struct AircraftListView: View {
     @Environment(PluginManager.self) var pluginManager
+    @State private var itemToDelete: PluginManager.Aircraft? = nil
 
     /// Aircraft stored directly under the central Aircraft folder.
     private var ungrouped: [PluginManager.Aircraft] {
@@ -46,7 +47,9 @@ struct AircraftListView: View {
     var body: some View {
         List {
             ForEach(ungrouped) { item in
-                AircraftRow(aircraft: item)
+                AircraftRow(aircraft: item, onDelete: {
+                    itemToDelete = item
+                })
             }
 
             ForEach(groupNames, id: \.self) { group in
@@ -56,7 +59,9 @@ struct AircraftListView: View {
                 Section {
                     if isExpanded {
                         ForEach(items) { item in
-                            AircraftRow(aircraft: item)
+                            AircraftRow(aircraft: item, onDelete: {
+                                itemToDelete = item
+                            })
                         }
                     }
                 } header: {
@@ -74,12 +79,28 @@ struct AircraftListView: View {
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
+        .alert(
+            "Delete Aircraft",
+            isPresented: Binding(
+                get: { itemToDelete != nil },
+                set: { if !$0 { itemToDelete = nil } }
+            ),
+            presenting: itemToDelete
+        ) { item in
+            Button("Delete", role: .destructive) {
+                pluginManager.deleteAircraft(item)
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: { item in
+            Text("Are you sure you want to delete '\(item.name)'?\n\nThis will permanently delete the files from your Central Data Folder ('Aircraft/\(item.folderName)'), unlink it from X-Plane, and remove it from all profiles.\n\nThis action cannot be undone.")
+        }
     }
 }
 
 struct AircraftRow: View {
     @Environment(PluginManager.self) var pluginManager
     let aircraft: PluginManager.Aircraft
+    var onDelete: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -100,6 +121,22 @@ struct AircraftRow: View {
             }
 
             Spacer()
+
+            if pluginManager.isAircraftModified(aircraft) {
+                HStack(spacing: 3) {
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 5, height: 5)
+                    Text("Modified")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.orange)
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.orange.opacity(0.12))
+                .clipShape(Capsule())
+            }
 
             Text(aircraft.isEnabled ? "Enabled" : "Disabled")
                 .font(.caption2)
@@ -125,6 +162,13 @@ struct AircraftRow: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color(NSColor.separatorColor), lineWidth: 0.5)
         )
+        .contextMenu {
+            Button(role: .destructive) {
+                onDelete?()
+            } label: {
+                Label("Delete Add-on...", systemImage: "trash")
+            }
+        }
     }
 }
 

@@ -21,14 +21,23 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
+
+extension Notification.Name {
+    static let installAddonRequested = Notification.Name("installAddonRequested")
+}
 
 struct ContentView: View {
     @Environment(PluginManager.self) var pluginManager
     @Environment(UpdateManager.self) var updateManager
     @Environment(CSLManager.self) var cslManager
     @Environment(AppUpdateManager.self) var appUpdateManager
+    @Environment(NavdataManager.self) var navdataManager
     @Binding var showWelcomeScreen: Bool
     @State private var selectedCategory: NavigationCategory? = .aircraft
+    @State private var installerAnalysis: AddonPackageAnalysis? = nil
+    @State private var isDropTargeted: Bool = false
+    @State private var isShowingFileImporter: Bool = false
 
     init(showWelcomeScreen: Binding<Bool> = .constant(false)) {
         self._showWelcomeScreen = showWelcomeScreen
@@ -40,8 +49,9 @@ struct ContentView: View {
         case scenery = "Scenery"
         case luaScripts = "Lua Scripts"
         case scripts = "Profile Scripts"
-        case csl = "CSL"
-        case updates = "Updates"
+        case addonUpdates = "Add-ons"
+        case csl = "CSL Models"
+        case navdata = "Navigation Data"
         case settings = "Settings"
         case about = "About"
 
@@ -54,45 +64,97 @@ struct ContentView: View {
             case .scenery: return "map"
             case .luaScripts: return "scroll"
             case .scripts: return "terminal"
+            case .addonUpdates: return "arrow.triangle.2.circlepath.circle"
             case .csl: return "airplane.circle"
-            case .updates: return "arrow.triangle.2.circlepath.circle"
+            case .navdata: return "point.topleft.down.to.point.bottomright.curvepath"
             case .settings: return "gearshape"
             case .about: return "info.circle"
             }
         }
 
-        static func mainCategories(cslEnabled: Bool) -> [NavigationCategory] {
-            var list: [NavigationCategory] = [.aircraft, .plugins, .scenery, .luaScripts, .scripts]
+        static var mainCategories: [NavigationCategory] {
+            [.aircraft, .plugins, .scenery, .luaScripts, .scripts]
+        }
+
+        static func updateCategories(addonUpdatesEnabled: Bool, cslEnabled: Bool, navdataEnabled: Bool) -> [NavigationCategory] {
+            // The add-on updater is a master switch in this fork: off means the
+            // tab is gone, not just empty.
+            var list: [NavigationCategory] = addonUpdatesEnabled ? [.addonUpdates] : []
             if cslEnabled {
                 list.append(.csl)
+            }
+            if navdataEnabled {
+                list.append(.navdata)
             }
             return list
         }
 
-        static func systemCategories(addonUpdatesEnabled: Bool) -> [NavigationCategory] {
-            addonUpdatesEnabled ? [.updates, .settings] : [.settings]
+        static var systemCategories: [NavigationCategory] {
+            [.settings]
         }
 
         var isAddonCategory: Bool {
-            self != .updates && self != .settings && self != .csl && self != .about
+            self == .aircraft || self == .plugins || self == .scenery || self == .luaScripts || self == .scripts
         }
+    }
+
+    private var visibleUpdateCategories: [NavigationCategory] {
+        NavigationCategory.updateCategories(
+            addonUpdatesEnabled: updateManager.enableAddonUpdates,
+            cslEnabled: pluginManager.enableCSLSupport,
+            navdataEnabled: pluginManager.enableNavdataSupport
+        )
     }
 
     var availableUpdatesCount: Int {
         updateManager.updatableAddons.filter { $0.isUpdateAvailable }.count
     }
 
+    var availableNavdataUpdatesCount: Int {
+        navdataManager.addons.filter { $0.isUpdateAvailable }.count
+    }
+
     var body: some View {
         NavigationSplitView {
             List(selection: $selectedCategory) {
                 Section("Add-ons") {
-                    ForEach(NavigationCategory.mainCategories(cslEnabled: pluginManager.enableCSLSupport)) { category in
+                    ForEach(NavigationCategory.mainCategories) { category in
+                        NavigationLink(value: category) {
+                            HStack(spacing: 8) {
+                                Label(category.rawValue, systemImage: category.systemImage)
+                                    .font(.body)
+                            }
+                        }
+                    }
+                }
+
+                // Every entry here sits behind a feature flag, so the whole section
+                // goes away rather than leaving an empty header behind.
+                if !visibleUpdateCategories.isEmpty {
+                Section("Updates") {
+                    ForEach(visibleUpdateCategories) { category in
                         NavigationLink(value: category) {
                             HStack(spacing: 8) {
                                 Label(category.rawValue, systemImage: category.systemImage)
                                     .font(.body)
 
-                                if category == .csl {
+                                if category == .addonUpdates {
+                                    Spacer()
+
+                                    if updateManager.isProcessing {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                    } else if availableUpdatesCount > 0 {
+                                        Text("\(availableUpdatesCount)")
+                                            .font(.caption2)
+                                            .fontWeight(.bold)
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Color.orange)
+                                            .clipShape(Capsule())
+                                    }
+                                } else if category == .csl {
                                     Spacer()
 
                                     if cslManager.isProcessing {
@@ -108,29 +170,14 @@ struct ContentView: View {
                                             .background(Color.orange)
                                             .clipShape(Capsule())
                                     }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Section("System") {
-                    ForEach(NavigationCategory.systemCategories(addonUpdatesEnabled: updateManager.enableAddonUpdates)) { category in
-                        NavigationLink(value: category) {
-                            HStack(spacing: 8) {
-                                Label(category.rawValue, systemImage: category.systemImage)
-                                    .font(.body)
-
-                                if category == .updates {
+                                } else if category == .navdata {
                                     Spacer()
 
-                                    if updateManager.isProcessing {
+                                    if navdataManager.isUpdatingAny || navdataManager.isFetchingPackages {
                                         ProgressView()
                                             .controlSize(.small)
-                                    }
-
-                                    if availableUpdatesCount > 0 {
-                                        Text("\(availableUpdatesCount)")
+                                    } else if availableNavdataUpdatesCount > 0 {
+                                        Text("\(availableNavdataUpdatesCount)")
                                             .font(.caption2)
                                             .fontWeight(.bold)
                                             .foregroundStyle(.white)
@@ -140,6 +187,18 @@ struct ContentView: View {
                                             .clipShape(Capsule())
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+                }
+
+                Section("System") {
+                    ForEach(NavigationCategory.systemCategories) { category in
+                        NavigationLink(value: category) {
+                            HStack(spacing: 8) {
+                                Label(category.rawValue, systemImage: category.systemImage)
+                                    .font(.body)
                             }
                         }
                     }
@@ -188,7 +247,6 @@ struct ContentView: View {
                 // Header Profile Bar (Only shown for Add-ons categories)
                 if let category = selectedCategory, category.isAddonCategory {
                     ProfileSelectorView()
-                        .padding(12)
 
                     Divider()
                 }
@@ -206,10 +264,12 @@ struct ContentView: View {
                         LuaScriptsListView()
                     case .scripts:
                         ScriptsListView()
+                    case .addonUpdates:
+                        UpdatesView()
                     case .csl:
                         CSLListView()
-                    case .updates:
-                        UpdatesView()
+                    case .navdata:
+                        NavdataListView()
                     case .settings:
                         SettingsView()
                     case .about:
@@ -233,13 +293,73 @@ struct ContentView: View {
                 .background(Material.bar)
             }
             .background(Color(NSColor.windowBackgroundColor))
+            .overlay {
+                if isDropTargeted {
+                    ZStack {
+                        Color.black.opacity(0.4)
+                        VStack(spacing: 12) {
+                            Image(systemName: "square.and.arrow.down.fill")
+                                .font(.system(size: 48))
+                                .foregroundStyle(.white)
+                            Text("Drop Add-on Package to Install")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundStyle(.white)
+                            Text("Supports .zip archives, folders, and .lua scripts")
+                                .font(.subheadline)
+                                .foregroundStyle(.white.opacity(0.8))
+                        }
+                        .padding(32)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .shadow(radius: 20)
+                    }
+                    .allowsHitTesting(false)
+                }
+            }
+        }
+        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+            handleDrop(providers: providers)
+        }
+        .sheet(item: $installerAnalysis) { analysis in
+            AddonInstallerView(analysis: analysis)
+        }
+        .fileImporter(
+            isPresented: $isShowingFileImporter,
+            allowedContentTypes: [.zip, .folder, .item],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first {
+                    Task { @MainActor in
+                        await analyzeAndPresentInstaller(url: url)
+                    }
+                }
+            case .failure(let error):
+                pluginManager.lastErrorMessage = "Failed to select file: \(error.localizedDescription)"
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .installAddonRequested)) { _ in
+            isShowingFileImporter = true
         }
         .sheet(isPresented: $showWelcomeScreen) {
             WelcomeView {
                 updateManager.scanUpdatableAddons()
                 if pluginManager.enableCSLSupport && cslManager.automaticallyCheckCSLUpdates {
                     cslManager.cslFolderURL = pluginManager.cslPath
+                    cslManager.xPlaneFolderURL = pluginManager.xPlanePath
+                    cslManager.launcherDataFolder = pluginManager.launcherDataFolder
                     cslManager.scanAndCheck()
+                }
+                if pluginManager.enableNavdataSupport {
+                    navdataManager.xPlaneURL = pluginManager.xPlanePath
+                    Task {
+                        await navdataManager.authManager.restoreSessionOnLaunch()
+                        if case .authenticated = navdataManager.authManager.authState, navdataManager.automaticallyCheckNavdataUpdates {
+                            await navdataManager.checkOnlinePackages()
+                        }
+                    }
                 }
             }
         }
@@ -257,6 +377,38 @@ struct ContentView: View {
             if let errorMsg = pluginManager.lastErrorMessage {
                 Text(errorMsg)
             }
+        }
+    }
+
+    private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier("public.file-url") }) else {
+            return false
+        }
+
+        provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, _ in
+            var targetURL: URL?
+
+            if let data = item as? Data {
+                targetURL = URL(dataRepresentation: data, relativeTo: nil)
+            } else if let url = item as? URL {
+                targetURL = url
+            }
+
+            guard let url = targetURL else { return }
+
+            Task { @MainActor in
+                await analyzeAndPresentInstaller(url: url)
+            }
+        }
+        return true
+    }
+
+    private func analyzeAndPresentInstaller(url: URL) async {
+        do {
+            let analysis = try await AddonInstallerService.shared.analyze(url: url)
+            self.installerAnalysis = analysis
+        } catch {
+            pluginManager.lastErrorMessage = "Failed to analyze package: \(error.localizedDescription)"
         }
     }
 }

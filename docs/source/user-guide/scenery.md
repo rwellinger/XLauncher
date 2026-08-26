@@ -57,11 +57,23 @@ X-Plane Launcher creates symbolic links in `<X-Plane 12>/Custom Scenery/` and ma
 
 If you use multi-folder scenery packages (such as SimHeaven regional sets), you can organize them into groups:
 
-1. Select multiple scenery items (hold `Shift` or `Command` while clicking).
-2. Click **Create Group** in the top toolbar.
+1. Select one or more scenery items (hold `Shift` or `Command` while clicking).
+2. Right-click any selected item and choose **Create Group from Selection...**.
 3. Enter a name for the group.
 
 ### Group Actions
 - **Expand / Collapse**: Click the chevron to expand or collapse group members.
 - **Reorder Group**: Dragging a group moves all member packages together.
-- **Ungroup**: Right-click the group header and choose **Ungroup** to restore individual rows.
+- **Add Items to Group**: Drag any scenery pack or selection onto a group header to move them into that group.
+- **Remove from Group**: Right-click a grouped scenery item and choose **Remove from Group**.
+- **Rename Group**: Right-click the group header and choose **Rename...**.
+- **Delete Group**: Right-click the group header and choose **Delete Group** to remove the group (individual scenery packages remain intact).
+
+---
+
+## Deleting Scenery
+
+Managed scenery packs (located in your Central Data Folder) can be deleted from the UI:
+- Right-click any managed scenery row and choose **Delete Add-on...**.
+- Confirming the deletion removes the scenery folder from your Central Data Folder, unlinks it from `Custom Scenery/`, updates `scenery_packs.ini`, and cleans up any scenery groups and profiles.
+- Unmanaged scenery residing directly in X-Plane's `Custom Scenery` directory is protected and cannot be deleted by the launcher.

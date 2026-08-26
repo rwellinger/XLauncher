@@ -28,6 +28,7 @@ struct SettingsView: View {
     @Environment(CSLManager.self) var cslManager
     @Environment(UpdateManager.self) var updateManager
     @Environment(SystemReadinessManager.self) var readinessManager
+    @Environment(NavdataManager.self) var navdataManager
     @State private var selectedEnvVarId: PluginManager.ScriptEnvVar.ID?
     @State private var showWelcomeSheet: Bool = false
     @State private var showReleaseNotesSheet: Bool = false
@@ -46,6 +47,7 @@ struct SettingsView: View {
         @Bindable var cslManager = cslManager
         @Bindable var updateManager = updateManager
         @Bindable var readinessManager = readinessManager
+        @Bindable var navdataManager = navdataManager
 
         VStack(spacing: 0) {
             // Header Bar
@@ -61,30 +63,34 @@ struct SettingsView: View {
             Divider()
 
             ScrollView {
-                VStack(spacing: 20) {
-                    GroupBox("General") {
-                        VStack(spacing: 8) {
-                            FolderSelectorRow(label: "X-Plane Location:", path: pluginManager.xPlanePath, placeholder: "Select X-Plane 12 folder") {
-                                let panel = NSOpenPanel()
-                                panel.canChooseFiles = false
-                                panel.canChooseDirectories = true
-                                panel.allowsMultipleSelection = false
-                                panel.prompt = "Select X-Plane Folder"
-                                if panel.runModal() == .OK {
-                                    pluginManager.xPlanePath = panel.url
+                VStack(spacing: 16) {
+                    GroupBox("Data Folders") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("The central data folder is used to manage and symlink add-ons across X-Plane installations.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Central Data Folder")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                    Text(pluginManager.launcherDataFolder?.path ?? "Not configured")
+                                        .font(.caption)
+                                        .foregroundStyle(pluginManager.launcherDataFolder != nil ? .primary : .secondary)
                                 }
-                            }
 
-                            Divider()
+                                Spacer()
 
-                            FolderSelectorRow(label: "Central Data Folder:", path: pluginManager.launcherDataFolder, placeholder: "Default (Application Support/XPlaneLauncher)") {
-                                let panel = NSOpenPanel()
-                                panel.canChooseFiles = false
-                                panel.canChooseDirectories = true
-                                panel.allowsMultipleSelection = false
-                                panel.prompt = "Select Central Data Folder"
-                                if panel.runModal() == .OK {
-                                    pluginManager.launcherDataFolder = panel.url
+                                Button("Browse...") {
+                                    let panel = NSOpenPanel()
+                                    panel.canChooseFiles = false
+                                    panel.canChooseDirectories = true
+                                    panel.allowsMultipleSelection = false
+                                    panel.prompt = "Select Central Data Folder"
+                                    if panel.runModal() == .OK {
+                                        pluginManager.launcherDataFolder = panel.url
+                                    }
                                 }
                             }
 
@@ -94,6 +100,7 @@ struct SettingsView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Welcome Guide")
                                         .font(.subheadline)
+                                        .fontWeight(.medium)
                                     Text("Review the setup assistant and feature overview.")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
@@ -154,6 +161,10 @@ struct SettingsView: View {
                                 Toggle("X-CSL models", isOn: $cslManager.automaticallyCheckCSLUpdates)
                                     .font(.body)
                                     .disabled(!pluginManager.enableCSLSupport)
+
+                                Toggle("Navigation data (Navigraph)", isOn: $navdataManager.automaticallyCheckNavdataUpdates)
+                                    .font(.body)
+                                    .disabled(!pluginManager.enableNavdataSupport)
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -241,28 +252,35 @@ struct SettingsView: View {
                                         Text("New Version Available: \(release.displayTitle)")
                                             .font(.subheadline)
                                             .fontWeight(.medium)
-                                        Text("Released on GitHub. You can download the latest installer (.dmg) or view the changelog.")
+                                        Text("Released on GitHub. You can update now or view the changelog.")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
 
                                     Spacer()
 
-                                    Button("What's New") {
-                                        showReleaseNotesSheet = true
-                                    }
-                                    .controlSize(.small)
+                                    if appUpdateManager.isSparkleUpdating {
+                                        HStack(spacing: 8) {
+                                            ProgressView()
+                                                .controlSize(.small)
+                                            Text(appUpdateManager.sparkleStatus.isEmpty ? "Updating..." : appUpdateManager.sparkleStatus)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    } else {
+                                        Button("What's New") {
+                                            showReleaseNotesSheet = true
+                                        }
+                                        .controlSize(.small)
 
-                                    Button(action: {
-                                        appUpdateManager.downloadLatestDMG()
-                                    }) {
-                                        Label(
-                                            release.dmgAsset != nil ? "Download DMG (\(release.dmgAsset!.formattedSize))" : "Download Update",
-                                            systemImage: "arrow.down.circle.fill"
-                                        )
+                                        Button(action: {
+                                            appUpdateManager.startInAppUpdate()
+                                        }) {
+                                            Label("Update & Relaunch", systemImage: "arrow.triangle.2.circlepath.circle.fill")
+                                        }
+                                        .buttonStyle(.borderedProminent)
+                                        .controlSize(.small)
                                     }
-                                    .buttonStyle(.borderedProminent)
-                                    .controlSize(.small)
                                 }
                                 .padding(8)
                                 .background(Color.orange.opacity(0.08))
@@ -304,6 +322,19 @@ struct SettingsView: View {
                                     .padding(.top, 2)
                                 }
                             }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                    }
+
+                    GroupBox("Navigation Data") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Toggle("Enable Navigraph navdata updates", isOn: $pluginManager.enableNavdataSupport)
+                                .font(.body)
+
+                            Text("When enabled, adds a Navigation Data tab in the sidebar to download and update AIRAC cycles directly from Navigraph for X-Plane and supported add-ons.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(8)

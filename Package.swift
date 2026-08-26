@@ -33,10 +33,21 @@ let package = Package(
     products: [
         .executable(name: "XPlaneLauncher", targets: ["XPlaneLauncher"])
     ],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0")
+    ],
     targets: [
         .executableTarget(
             name: "XPlaneLauncher",
+            dependencies: [
+                .product(name: "Sparkle", package: "Sparkle")
+            ],
             path: "Sources/XPlaneLauncher" // Explicitly pointing here just in case, though standard.
+        ),
+        .testTarget(
+            name: "XPlaneLauncherTests",
+            dependencies: ["XPlaneLauncher"],
+            path: "Tests/XPlaneLauncherTests"
         ),
     ]
 )

@@ -60,7 +60,7 @@ struct UpdatesView: View {
         VStack(spacing: 0) {
             // Header Bar
             HStack(spacing: 12) {
-                Label("Addon Updates", systemImage: "arrow.triangle.2.circlepath")
+                Label("Add-ons", systemImage: "arrow.triangle.2.circlepath")
                     .font(.title3)
                     .fontWeight(.bold)
 
@@ -133,7 +133,8 @@ struct UpdatesView: View {
 
             if showDebugConsole {
                 Divider()
-                ConsoleView(title: "Live Console", logger: updateManager.logger)
+                ConsoleView(title: "Updates Console", logger: updateManager.logger, initialCategory: .updates)
+                    .frame(height: 180)
             }
         }
     }

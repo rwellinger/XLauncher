@@ -54,6 +54,32 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -switch /Applications/Xcode_26.2.app/Contents/Developer
 
+      - name: Run Tests
+        run: |
+          if [ "$IS_DRAFT" = "false" ]; then
+            swift test
+          fi
+
+      - name: Install Apple Certificate
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE }}
+          P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+        run: |
+          if [ "$IS_DRAFT" = "false" ]; then
+            KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+            echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
+
+            security create-keychain -p "$P12_PASSWORD" "$KEYCHAIN_PATH"
+            security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+            security unlock-keychain -p "$P12_PASSWORD" "$KEYCHAIN_PATH"
+
+            echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
+            security import $RUNNER_TEMP/certificate.p12 -k "$KEYCHAIN_PATH" -P "$P12_PASSWORD" -T /usr/bin/codesign
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$P12_PASSWORD" "$KEYCHAIN_PATH"
+
+            security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          fi
+
       - name: Install Tools
         run: |
           brew install create-dmg
@@ -84,18 +110,26 @@ jobs:
       - name: Create App Bundle
         run: |
           chmod +x package.sh
-          # Run package script to create structure without rebuilding single arch
-          ./package.sh --skip-build
-          
-          # Overwrite with universal binary
-          cp .build/universal/XPlaneLauncher XLauncher.app/Contents/MacOS/XLauncher
+          # Run package script to create structure with universal binary
+          ./package.sh --skip-build --binary .build/universal/XPlaneLauncher
           
           # Update Version in Info.plist
           plutil -replace CFBundleShortVersionString -string "$VERSION" XLauncher.app/Contents/Info.plist
           plutil -replace CFBundleVersion -string "${{ github.run_number }}" XLauncher.app/Contents/Info.plist
           
-          # Resign the app after modification
-          codesign -f -s - XLauncher.app
+          if [ "$IS_DRAFT" = "false" ]; then
+            echo "Signing Sparkle framework and app bundle with Developer ID and Hardened Runtime..."
+            codesign --force --deep --options runtime --timestamp \
+              --sign "Developer ID Application" \
+              XLauncher.app/Contents/Frameworks/Sparkle.framework
+
+            codesign --force --deep --options runtime --timestamp \
+              --sign "Developer ID Application" \
+              --entitlements entitlements.plist \
+              XLauncher.app
+          else
+            codesign --force --deep -s - XLauncher.app
+          fi
 
       - name: Create DMG
         run: |
@@ -111,6 +145,66 @@ jobs:
             "XLauncher.dmg" \
             "XLauncher.app"
 
+      - name: Sign & Notarize DMG
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          if [ "$IS_DRAFT" = "false" ]; then
+            echo "Signing DMG..."
+            codesign --force --timestamp \
+              --sign "Developer ID Application" \
+              XLauncher.dmg
+
+            echo "Setting up Apple API Key..."
+            mkdir -p ~/.private_keys
+            echo "$APPLE_API_KEY" | base64 --decode > ~/.private_keys/AuthKey_${APPLE_API_KEY_ID}.p8
+
+            echo "Submitting DMG to Apple Notary Service..."
+            xcrun notarytool submit XLauncher.dmg \
+              --key "$HOME/.private_keys/AuthKey_${APPLE_API_KEY_ID}.p8" \
+              --key-id "$APPLE_API_KEY_ID" \
+              --issuer "$APPLE_API_ISSUER" \
+              --wait
+
+            echo "Stapling notarization ticket to DMG and App..."
+            xcrun stapler staple XLauncher.dmg
+            xcrun stapler staple XLauncher.app || true
+
+            echo "Validating notarization ticket..."
+            xcrun stapler validate XLauncher.dmg
+          fi
+
+      - name: Create Sparkle Update Archive
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          echo "Creating ZIP archive of app bundle..."
+          ditto -c -k --keepParent XLauncher.app XLauncher-macOS.zip
+
+          GENERATE_APPCAST=$(find .build -name "generate_appcast" -type f | head -n 1)
+          if [ -n "$SPARKLE_PRIVATE_KEY" ] && [ -n "$GENERATE_APPCAST" ]; then
+            echo "Generating Sparkle appcast.xml..."
+            mkdir -p sparkle_staging
+            cp XLauncher-macOS.zip sparkle_staging/
+            echo "$SPARKLE_PRIVATE_KEY" > sparkle_key.txt
+            DOWNLOAD_PREFIX="https://github.com/jcorbier/XLauncher/releases/download/${TAG_NAME}/"
+            "$GENERATE_APPCAST" --download-url-prefix "$DOWNLOAD_PREFIX" --ed-key-file sparkle_key.txt sparkle_staging/ || true
+            if [ -f "sparkle_staging/appcast.xml" ]; then
+              cp sparkle_staging/appcast.xml ./appcast.xml
+            fi
+            rm -f sparkle_key.txt
+          fi
+
+      - name: Cleanup Keychain
+        if: always()
+        run: |
+          if [ -n "$KEYCHAIN_PATH" ] && [ -f "$KEYCHAIN_PATH" ]; then
+            security delete-keychain "$KEYCHAIN_PATH" || true
+          fi
+          rm -rf ~/.private_keys
+
       - name: Generate Changelog
         run: |
           chmod +x generate_changelog.sh
@@ -125,7 +219,10 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v3
         with:
-          files: XLauncher.dmg
+          files: |
+            XLauncher.dmg
+            XLauncher-macOS.zip
+            appcast.xml
           body_path: RELEASE_CHANGELOG.md
           prerelease: ${{ steps.vars.outputs.prerelease }}
           name: ${{ steps.vars.outputs.release_name }}

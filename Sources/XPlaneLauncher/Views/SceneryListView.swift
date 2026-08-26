@@ -28,50 +28,65 @@ struct SceneryListView: View {
     @State private var selection = Set<UUID>()
     @State private var isCreatingGroup = false
     @State private var newGroupName = ""
+    @State private var itemToDelete: PluginManager.Scenery? = nil
 
     var body: some View {
-        NavigationStack {
-            List(selection: $selection) {
-                ForEach(displayItems) { item in
-                    switch item {
-                    case .group(let group, let members):
-                        SceneryGroupSection(group: group, members: members, selection: selection)
-                    case .simple(let scenery):
-                        SceneryRow(item: scenery, selection: selection)
-                            .tag(scenery.id)
-                            .draggable(scenery.id.uuidString)
-                    }
-                }
-                .onMove(perform: moveDisplayItems)
-
-                if pluginManager.scenery.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Scenery Found", systemImage: "map")
-                    } description: {
-                        Text("Check your Central Data Folder ('Scenery' subfolder).")
-                    }
-                }
-            }
-            .listStyle(.inset)
-            .scrollContentBackground(.hidden)
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Create Group", systemImage: "folder.badge.plus") {
+        List(selection: $selection) {
+            ForEach(displayItems) { item in
+                switch item {
+                case .group(let group, let members):
+                    SceneryGroupSection(group: group, members: members, selection: selection, onDelete: {
+                        itemToDelete = $0
+                    }, onCreateGroup: {
                         newGroupName = ""
                         isCreatingGroup = true
-                    }
-                    .disabled(selection.isEmpty)
+                    })
+                case .simple(let scenery):
+                    SceneryRow(item: scenery, selection: selection, onDelete: {
+                        itemToDelete = scenery
+                    }, onCreateGroup: {
+                        newGroupName = ""
+                        isCreatingGroup = true
+                    })
+                        .tag(scenery.id)
+                        .draggable(scenery.id.uuidString)
                 }
             }
-            .alert("New Group", isPresented: $isCreatingGroup) {
-                TextField("Group Name", text: $newGroupName)
-                Button("Cancel", role: .cancel) { }
-                Button("Create") {
-                    createGroupFromSelection()
+            .onMove(perform: moveDisplayItems)
+
+            if pluginManager.scenery.isEmpty {
+                ContentUnavailableView {
+                    Label("No Scenery Found", systemImage: "map")
+                } description: {
+                    Text("Check your Central Data Folder ('Scenery' subfolder).")
                 }
-            } message: {
-                Text("Enter a name for the new scenery group.")
             }
+        }
+        .listStyle(.inset)
+        .scrollContentBackground(.hidden)
+        .alert("New Group", isPresented: $isCreatingGroup) {
+            TextField("Group Name", text: $newGroupName)
+            Button("Cancel", role: .cancel) { }
+            Button("Create") {
+                createGroupFromSelection()
+            }
+        } message: {
+            Text("Enter a name for the new scenery group.")
+        }
+        .alert(
+            "Delete Scenery",
+            isPresented: Binding(
+                get: { itemToDelete != nil },
+                set: { if !$0 { itemToDelete = nil } }
+            ),
+            presenting: itemToDelete
+        ) { item in
+            Button("Delete", role: .destructive) {
+                pluginManager.deleteScenery(item)
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: { item in
+            Text("Are you sure you want to delete '\(item.name)'?\n\nThis will permanently delete the files from your Central Data Folder ('Scenery/\(item.folderName)'), unlink it from X-Plane, remove it from scenery_packs.ini, and remove it from all profiles.\n\nThis action cannot be undone.")
         }
     }
 
@@ -146,6 +161,8 @@ struct SceneryGroupSection: View {
     let group: PluginManager.SceneryGroup
     let members: [PluginManager.Scenery]
     let selection: Set<UUID>
+    var onDelete: ((PluginManager.Scenery) -> Void)? = nil
+    var onCreateGroup: (() -> Void)? = nil
 
     @State private var isRenaming = false
     @State private var renameText = ""
@@ -160,18 +177,37 @@ struct SceneryGroupSection: View {
             }
         )) {
             ForEach(members) { item in
-                SceneryRow(item: item, selection: selection)
+                SceneryRow(item: item, selection: selection, onDelete: {
+                    onDelete?(item)
+                }, onCreateGroup: onCreateGroup)
                     .padding(.leading, 8)
                     .tag(item.id)
                     .draggable(item.id.uuidString)
             }
             .onMove(perform: moveMembers)
         } label: {
-            HStack {
+            HStack(spacing: 8) {
                 Image(systemName: "folder.fill")
                     .foregroundStyle(.blue)
                 Text(group.name)
                     .font(.headline)
+
+                if !group.isExpanded && members.contains(where: { pluginManager.isSceneryModified($0) }) {
+                    HStack(spacing: 3) {
+                        Circle()
+                            .fill(Color.orange)
+                            .frame(width: 5, height: 5)
+                        Text("Modified")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.orange)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.orange.opacity(0.12))
+                    .clipShape(Capsule())
+                }
+
                 Spacer()
 
                 // Group Toggles
@@ -274,60 +310,61 @@ struct SceneryRow: View {
     @Environment(PluginManager.self) var pluginManager
     let item: PluginManager.Scenery
     let selection: Set<UUID>
+    var onDelete: (() -> Void)? = nil
+    var onCreateGroup: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: item.isEnabled ? "map.fill" : "map")
                 .font(.title3)
-                .foregroundStyle(statusColor)
+                .foregroundStyle(item.isEnabled ? .green : .secondary)
                 .frame(width: 32, height: 32)
-                .background(statusColor.opacity(0.12))
+                .background(item.isEnabled ? Color.green.opacity(0.12) : Color.secondary.opacity(0.12))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.name)
                     .font(.body)
                     .fontWeight(.medium)
-                if !item.isManaged && !item.isInIni {
-                    Text("New (Unmanaged)")
-                        .font(.caption)
-                        .foregroundStyle(.blue)
-                } else if !item.isInIni && item.isEnabled {
-                    Text("New")
-                        .font(.caption)
-                        .foregroundStyle(.blue)
-                } else if !item.isEnabled && !item.isInIni {
-                    Text("Not Installed")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                Text(item.folderName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            Text(item.isEnabled ? "Enabled" : (item.isInIni ? "Disabled" : "Available"))
+            if pluginManager.isSceneryModified(item) {
+                HStack(spacing: 3) {
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 5, height: 5)
+                    Text("Modified")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.orange)
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.orange.opacity(0.12))
+                .clipShape(Capsule())
+            }
+
+            Text(item.isEnabled ? "Enabled" : "Disabled")
                 .font(.caption2)
                 .fontWeight(.semibold)
-                .foregroundStyle(statusColor)
+                .foregroundStyle(item.isEnabled ? .green : .secondary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(statusColor.opacity(0.12))
+                .background(item.isEnabled ? Color.green.opacity(0.12) : Color.secondary.opacity(0.12))
                 .clipShape(Capsule())
 
-            if item.isEnabled || item.isInIni {
-                Toggle("", isOn: Binding(
-                    get: { item.isEnabled },
-                    set: { _ in pluginManager.toggleScenery(item) }
-                ))
-                .toggleStyle(.switch)
-                .labelsHidden()
-                .disabled(!item.isToggleable)
-            } else {
-                Button("Install") {
-                    pluginManager.toggleScenery(item)
-                }
-                .buttonStyle(.bordered)
-            }
+            Toggle("", isOn: Binding(
+                get: { item.isEnabled },
+                set: { _ in pluginManager.toggleScenery(item) }
+            ))
+            .toggleStyle(.switch)
+            .labelsHidden()
+            .disabled(!item.isToggleable)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -338,9 +375,21 @@ struct SceneryRow: View {
                 .stroke(Color(NSColor.separatorColor), lineWidth: 0.5)
         )
         .contextMenu {
+            if !selection.isEmpty {
+                Button("Create Group from Selection...", systemImage: "folder.badge.plus") {
+                    onCreateGroup?()
+                }
+            }
             if pluginManager.sceneryGroups.contains(where: { $0.childFolderNames.contains(item.folderName) }) {
                 Button("Remove from Group") {
                     pluginManager.removeFromGroup(item)
+                }
+            }
+            if item.isManaged {
+                Button(role: .destructive) {
+                    onDelete?()
+                } label: {
+                    Label("Delete Add-on...", systemImage: "trash")
                 }
             }
         }
@@ -379,11 +428,5 @@ struct SceneryRow: View {
             }
             return false
         }
-    }
-
-    var statusColor: Color {
-        if item.isEnabled { return .green }
-        if item.isInIni { return .orange }
-        return .secondary
     }
 }

@@ -212,8 +212,9 @@ final class SymlinkService: Sendable {
     }
 
     func setPluginEnabled(folderName: String, enabled: Bool, dataFolder: URL, targetFolder: URL) throws {
-        let sourceURL = dataFolder.appendingPathComponent(folderName)
-        let linkURL = targetFolder.appendingPathComponent(folderName)
+        let cleanName = try PathSecurity.sanitizePathComponent(folderName)
+        let sourceURL = try PathSecurity.validateSubpath(relativePath: cleanName, within: dataFolder)
+        let linkURL = try PathSecurity.validateSubpath(relativePath: cleanName, within: targetFolder)
 
         if enabled {
             try createOrReplaceLink(at: linkURL, to: sourceURL)
@@ -287,8 +288,11 @@ final class SymlinkService: Sendable {
     }
 
     func setAircraftEnabled(folderName: String, enabled: Bool, dataFolder: URL, targetFolder: URL) throws {
-        let sourceURL = dataFolder.appendingPathComponent(folderName)
-        let linkURL = targetFolder.appendingPathComponent(folderName)
+        // Aircraft may sit one level down inside a grouping folder, so the name is
+        // a relative path ("Heli/AW109SP"), not a single component. validateSubpath
+        // accepts that while still guaranteeing the result stays inside the folder.
+        let sourceURL = try PathSecurity.validateSubpath(relativePath: folderName, within: dataFolder)
+        let linkURL = try PathSecurity.validateSubpath(relativePath: folderName, within: targetFolder)
         let groupURL = linkURL.deletingLastPathComponent()
         let isGrouped = groupURL.standardizedFileURL != targetFolder.standardizedFileURL
 
@@ -349,30 +353,34 @@ final class SymlinkService: Sendable {
     }
 
     func setLuaScriptEnabled(item: LuaScript, enabled: Bool, dataFolder: URL, targetFolder: URL) throws {
-        let itemSourceURL = dataFolder.appendingPathComponent(item.folderName)
+        let cleanName = try PathSecurity.sanitizePathComponent(item.folderName)
+        let itemSourceURL = try PathSecurity.validateSubpath(relativePath: cleanName, within: dataFolder)
 
         if enabled {
             try? fileManager.createDirectory(at: targetFolder, withIntermediateDirectories: true)
             if item.isDirectory {
                 let children = try fileManager.contentsOfDirectory(at: itemSourceURL, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
                 for child in children {
-                    let linkURL = targetFolder.appendingPathComponent(child.lastPathComponent)
+                    let childCleanName = try PathSecurity.sanitizePathComponent(child.lastPathComponent)
+                    let linkURL = try PathSecurity.validateSubpath(relativePath: childCleanName, within: targetFolder)
                     try createOrReplaceLink(at: linkURL, to: child)
                 }
             } else {
-                let linkURL = targetFolder.appendingPathComponent(item.folderName)
+                let linkURL = try PathSecurity.validateSubpath(relativePath: cleanName, within: targetFolder)
                 try createOrReplaceLink(at: linkURL, to: itemSourceURL)
             }
         } else {
             if item.isDirectory {
                 if let children = try? fileManager.contentsOfDirectory(at: itemSourceURL, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) {
                     for child in children {
-                        let linkURL = targetFolder.appendingPathComponent(child.lastPathComponent)
-                        try removeLink(at: linkURL)
+                        if let childCleanName = try? PathSecurity.sanitizePathComponent(child.lastPathComponent),
+                           let linkURL = try? PathSecurity.validateSubpath(relativePath: childCleanName, within: targetFolder) {
+                            try removeLink(at: linkURL)
+                        }
                     }
                 }
             } else {
-                let linkURL = targetFolder.appendingPathComponent(item.folderName)
+                let linkURL = try PathSecurity.validateSubpath(relativePath: cleanName, within: targetFolder)
                 try removeLink(at: linkURL)
             }
         }

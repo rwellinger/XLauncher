@@ -25,12 +25,20 @@ import SwiftUI
 @main
 struct XPlaneLauncherApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @Environment(\.openWindow) private var openWindow
     @State private var pluginManager = PluginManager()
     @State private var updateManager = UpdateManager()
     @State private var cslManager = CSLManager()
     @State private var appUpdateManager = AppUpdateManager()
     @State private var readinessManager = SystemReadinessManager()
+    @State private var authManager: NavigraphAuthManager
+    @State private var navdataManager: NavdataManager
     @State private var showWelcomeScreen = false
+    init() {
+        let auth = NavigraphAuthManager()
+        self._authManager = State(initialValue: auth)
+        self._navdataManager = State(initialValue: NavdataManager(authManager: auth))
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -40,10 +48,24 @@ struct XPlaneLauncherApp: App {
                 .environment(cslManager)
                 .environment(appUpdateManager)
                 .environment(readinessManager)
+                .environment(authManager)
+                .environment(navdataManager)
                 .frame(minWidth: 600, minHeight: 500)
                 .onAppear {
                     updateManager.launcherDataFolder = pluginManager.launcherDataFolder
                     cslManager.cslFolderURL = pluginManager.cslPath
+                    cslManager.xPlaneFolderURL = pluginManager.xPlanePath
+                    cslManager.launcherDataFolder = pluginManager.launcherDataFolder
+                    if pluginManager.enableNavdataSupport {
+                        navdataManager.xPlaneURL = pluginManager.xPlanePath
+                        navdataManager.launcherDataFolder = pluginManager.launcherDataFolder
+                        Task {
+                            await authManager.restoreSessionOnLaunch()
+                            if case .authenticated = authManager.authState, navdataManager.automaticallyCheckNavdataUpdates {
+                                await navdataManager.checkOnlinePackages()
+                            }
+                        }
+                    }
                     if pluginManager.enableCSLSupport && cslManager.automaticallyCheckCSLUpdates {
                         cslManager.scanAndCheck()
                     }
@@ -56,9 +78,20 @@ struct XPlaneLauncherApp: App {
                 }
                 .onChange(of: pluginManager.launcherDataFolder) { _, newValue in
                     updateManager.launcherDataFolder = newValue
+                    cslManager.launcherDataFolder = newValue
+                    if pluginManager.enableNavdataSupport {
+                        navdataManager.launcherDataFolder = newValue
+                    }
+                }
+                .onChange(of: pluginManager.xPlanePath) { _, newValue in
+                    cslManager.xPlaneFolderURL = newValue
+                    if pluginManager.enableNavdataSupport {
+                        navdataManager.xPlaneURL = newValue
+                    }
                 }
                 .onChange(of: pluginManager.cslPath) { _, newValue in
                     cslManager.cslFolderURL = newValue
+                    cslManager.xPlaneFolderURL = pluginManager.xPlanePath
                     if pluginManager.enableCSLSupport && cslManager.automaticallyCheckCSLUpdates {
                         cslManager.scanAndCheck()
                     }
@@ -66,6 +99,7 @@ struct XPlaneLauncherApp: App {
                 .onChange(of: pluginManager.enableCSLSupport) { _, enabled in
                     if enabled {
                         cslManager.cslFolderURL = pluginManager.cslPath
+                        cslManager.xPlaneFolderURL = pluginManager.xPlanePath
                         if cslManager.automaticallyCheckCSLUpdates {
                             cslManager.scanAndCheck()
                         }
@@ -78,11 +112,27 @@ struct XPlaneLauncherApp: App {
                         cslManager.revertXP12LightsFromAll()
                     }
                 }
+                .onChange(of: pluginManager.enableNavdataSupport) { _, enabled in
+                    if enabled {
+                        navdataManager.xPlaneURL = pluginManager.xPlanePath
+                        Task {
+                            await authManager.restoreSessionOnLaunch()
+                            if case .authenticated = authManager.authState, navdataManager.automaticallyCheckNavdataUpdates {
+                                await navdataManager.checkOnlinePackages()
+                            }
+                        }
+                    }
+                }
         }
         .windowResizability(.contentSize)
         .windowStyle(.hiddenTitleBar) // Modern look
         .commands {
-            CommandGroup(replacing: .newItem) { }
+            CommandGroup(replacing: .newItem) {
+                Button("Install Add-on...") {
+                    NotificationCenter.default.post(name: .installAddonRequested, object: nil)
+                }
+                .keyboardShortcut("i", modifiers: .command)
+            }
             CommandGroup(replacing: .saveItem) { }
             CommandGroup(replacing: .printItem) { }
             CommandGroup(replacing: .importExport) { }
@@ -105,11 +155,22 @@ struct XPlaneLauncherApp: App {
                 }
             }
         }
+
+        Window("Logs", id: "logs-window") {
+            LogsDialogView()
+        }
+        .keyboardShortcut("l", modifiers: [.command, .option])
+        .defaultSize(width: 800, height: 500)
+        .windowResizability(.contentMinSize)
     }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return true
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        return .terminateNow
     }
 }

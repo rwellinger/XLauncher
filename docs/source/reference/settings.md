@@ -25,9 +25,10 @@ Configure which components automatically check for new versions and updates when
 - **SkunkCrafts add-ons**: When enabled, queries remote servers for updates to SkunkCrafts-managed add-ons on startup.
 - **X-Updater add-ons**: When enabled, queries remote servers for updates to X-Updater-managed add-ons on startup.
 - **X-CSL models**: When enabled, synchronizes the package index and checks for model updates from the X-CSL repository on startup (available when X-CSL support is enabled).
+- **Navigation data (Navigraph)**: When enabled, checks Navigraph for newly published AIRAC cycles on startup (available when Navigation Data support is enabled).
 
 :::{note}
-Disabling automatic checks on launch does not prevent manual checks. You can still check for updates at any time from the **Updates**, **CSL**, or **Settings** tabs.
+Disabling automatic checks on launch does not prevent manual checks. You can still check for updates at any time from the **Updates**, **CSL**, **Navigation Data**, or **Settings** tabs.
 :::
 
 ---
@@ -36,7 +37,7 @@ Disabling automatic checks on launch does not prevent manual checks. You can sti
 
 - **Include pre-release and beta versions**: When enabled, checks for pre-release and beta builds on GitHub in addition to stable releases.
 - **Check Now**: Manually checks GitHub for application updates immediately.
-- **What's New / Download**: View version release notes and changelogs, or download the latest disk image installer (`.dmg`) directly when an update is detected.
+- **What's New / Update & Relaunch**: View version release notes and changelogs, or update and relaunch the application in-place directly from the UI (with a manual `.dmg` download option available as a fallback).
 
 ---
 
@@ -44,6 +45,12 @@ Disabling automatic checks on launch does not prevent manual checks. You can sti
 
 - **Enable X-CSL support**: Adds the CSL tab to the sidebar for managing multiplayer aircraft models in `<X-Plane 12>/Resources/plugins/IVAO_CSL/CSL`.
 - **Apply modern X-Plane 12 lighting to X-CSL models**: Injects photometric parameterized lighting, ground spill, dynamic strobe sequences, and gear-coupled taxi light animations into installed CSL aircraft models.
+
+---
+
+## Navigation Data
+
+- **Enable Navigraph navdata updates**: Adds the Navigation Data tab to the sidebar for downloading and updating AIRAC cycles directly from Navigraph for X-Plane 12 and supported add-ons.
 
 ---
 
