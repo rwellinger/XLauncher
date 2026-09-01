@@ -212,7 +212,7 @@ final class SkunkCraftsUpdaterService: Sendable {
         folderURL: URL,
         config: SkunkCraftsConfig,
         logHandler: @Sendable @escaping @MainActor (String) -> Void = { _ in }
-    ) async throws -> (latestVersion: String?, isUpdateAvailable: Bool, statusMessage: String) {
+    ) async throws -> (latestVersion: String?, isUpdateAvailable: Bool, needsRepair: Bool, statusMessage: String) {
         guard let baseURLString = config.baseURL ?? config.remoteManifestURL else {
             await logHandler("[SkunkCrafts] No remote URL configured for \(config.name)")
             throw URLError(.badURL)
@@ -295,29 +295,29 @@ final class SkunkCraftsUpdaterService: Sendable {
         }
 
         let versionMismatch = (remoteVersion != nil && config.version != nil && remoteVersion != config.version)
-        let isUpdateAvailable = versionMismatch || (modifiedCount > 0)
+        // Only a newer remote version counts as an update. Differing files at the
+        // same version are almost always legitimate local configuration changes,
+        // so they are reported as a repair hint instead of an offered download.
+        let isUpdateAvailable = versionMismatch
+        let needsRepair = !versionMismatch && modifiedCount > 0
         let latestVersion = remoteVersion ?? config.version
 
         var statusMessage = "Up to date"
-        if isUpdateAvailable {
-            if let rVersion = remoteVersion, rVersion != config.version {
-                if modifiedCount > 0 {
-                    statusMessage = "Update available (\(rVersion) - \(modifiedCount) modified files)"
-                } else {
-                    statusMessage = "Update available (\(rVersion))"
-                }
-                await logHandler("[SkunkCrafts] Version mismatch: Local '\(config.version ?? "none")' vs Remote '\(rVersion)'")
-            } else if modifiedCount > 0 {
-                statusMessage = "Update available (\(modifiedCount) modified files)"
-                await logHandler("[SkunkCrafts] \(modifiedCount) files modified or missing")
+        if versionMismatch, let rVersion = remoteVersion {
+            if modifiedCount > 0 {
+                statusMessage = "Update available (\(rVersion) - \(modifiedCount) modified files)"
             } else {
-                statusMessage = "Update available"
+                statusMessage = "Update available (\(rVersion))"
             }
+            await logHandler("[SkunkCrafts] Version mismatch: Local '\(config.version ?? "none")' vs Remote '\(rVersion)'")
+        } else if needsRepair {
+            statusMessage = "Up to date (\(modifiedCount) modified file\(modifiedCount > 1 ? "s" : ""))"
+            await logHandler("[SkunkCrafts] \(config.name) is on the latest version; \(modifiedCount) file\(modifiedCount > 1 ? "s differ" : " differs") locally")
         } else {
             await logHandler("[SkunkCrafts] \(config.name) is up to date.")
         }
 
-        return (latestVersion, isUpdateAvailable, statusMessage)
+        return (latestVersion, isUpdateAvailable, needsRepair, statusMessage)
     }
 
     func downloadAndApplyUpdates(
@@ -444,6 +444,7 @@ extension SkunkCraftsUpdaterService: AddonUpdater {
         return AddonUpdateCheckResult(
             latestVersion: result.latestVersion,
             isUpdateAvailable: result.isUpdateAvailable,
+            needsRepair: result.needsRepair,
             statusMessage: result.statusMessage
         )
     }

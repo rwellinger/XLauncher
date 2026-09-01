@@ -239,6 +239,7 @@ class UpdateManager {
                 updatableAddons[i].isChecking = false
                 updatableAddons[i].latestVersion = result.latestVersion
                 updatableAddons[i].isUpdateAvailable = result.isUpdateAvailable
+                updatableAddons[i].needsRepair = result.needsRepair
                 updatableAddons[i].statusMessage = result.statusMessage
             }
         } catch {
@@ -246,6 +247,7 @@ class UpdateManager {
             if let i = updatableAddons.firstIndex(where: { $0.id == addonId }) {
                 updatableAddons[i].isChecking = false
                 updatableAddons[i].isUpdateAvailable = false
+                updatableAddons[i].needsRepair = false
                 updatableAddons[i].statusMessage = "Check failed"
             }
         }
@@ -280,6 +282,7 @@ class UpdateManager {
                     }
                     self.updatableAddons[i].isUpdating = false
                     self.updatableAddons[i].isUpdateAvailable = false
+                    self.updatableAddons[i].needsRepair = false
                     self.updatableAddons[i].statusMessage = "Up to date"
                 }
             } catch {

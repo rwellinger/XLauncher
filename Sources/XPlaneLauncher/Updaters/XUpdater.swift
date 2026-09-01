@@ -627,7 +627,7 @@ final class XUpdaterService: Sendable {
         folderURL: URL,
         config: XUpdaterConfig,
         logHandler: @Sendable @escaping @MainActor (String) -> Void = { _ in }
-    ) async throws -> (latestVersion: String?, isUpdateAvailable: Bool, statusMessage: String) {
+    ) async throws -> (latestVersion: String?, isUpdateAvailable: Bool, needsRepair: Bool, statusMessage: String) {
         var activeConfig = config
         if (activeConfig.login == nil || activeConfig.licenseKey == nil || activeConfig.snapshotNum == nil),
            let configFile = findConfig(in: folderURL),
@@ -648,7 +648,7 @@ final class XUpdaterService: Sendable {
 
             if files.isEmpty && remoteVersion == nil {
                 await logHandler("[X-Updater] No remote manifest returned; assuming \(activeConfig.name) is up to date.")
-                return (activeConfig.version, false, "Up to date")
+                return (activeConfig.version, false, false, "Up to date")
             }
 
             var modifiedCount = 0
@@ -688,7 +688,12 @@ final class XUpdaterService: Sendable {
 
             let totalChanges = modifiedCount + missingCount + deleteCount
             let snapshotMismatch = (remoteSnapshotNum != nil && activeConfig.snapshotNum != nil && remoteSnapshotNum! > activeConfig.snapshotNum!)
-            let isUpdateAvailable = snapshotMismatch || (totalChanges > 0)
+            let versionMismatch = (remoteVersion != nil && remoteVersion != activeConfig.version)
+            // Only a newer remote release counts as an update. Files differing at the
+            // same version are usually legitimate local configuration changes, so they
+            // are reported as a repair hint instead of an offered download.
+            let isUpdateAvailable = snapshotMismatch || versionMismatch
+            let needsRepair = !isUpdateAvailable && totalChanges > 0
 
             var statusMessage = "Up to date"
             if isUpdateAvailable {
@@ -699,26 +704,26 @@ final class XUpdaterService: Sendable {
                         statusMessage = "Update available (\(rVersion))"
                     }
                     await logHandler("[X-Updater] Update available: Local '\(activeConfig.version ?? "none")' vs Remote '\(rVersion)'")
-                } else if totalChanges > 0 {
-                    if missingCount > 0 && modifiedCount == 0 {
-                        statusMessage = "Needs repair (\(missingCount) missing file\(missingCount > 1 ? "s" : ""))"
-                    } else if modifiedCount > 0 && missingCount == 0 {
-                        statusMessage = "Needs repair (\(modifiedCount) modified file\(modifiedCount > 1 ? "s" : ""))"
-                    } else {
-                        statusMessage = "Needs repair (\(totalChanges) changed files)"
-                    }
-                    await logHandler("[X-Updater] \(totalChanges) files modified, missing, or deprecated locally")
                 } else {
                     statusMessage = "Update available"
                 }
+            } else if needsRepair {
+                if missingCount > 0 && modifiedCount == 0 {
+                    statusMessage = "Up to date (\(missingCount) missing file\(missingCount > 1 ? "s" : ""))"
+                } else if modifiedCount > 0 && missingCount == 0 {
+                    statusMessage = "Up to date (\(modifiedCount) modified file\(modifiedCount > 1 ? "s" : ""))"
+                } else {
+                    statusMessage = "Up to date (\(totalChanges) changed files)"
+                }
+                await logHandler("[X-Updater] \(totalChanges) files modified, missing, or deprecated locally")
             } else {
                 await logHandler("[X-Updater] \(activeConfig.name) is up to date.")
             }
 
-            return (latestVersion, isUpdateAvailable, statusMessage)
+            return (latestVersion, isUpdateAvailable, needsRepair, statusMessage)
         } catch {
             await logHandler("[X-Updater] Error checking remote endpoint for \(activeConfig.name): \(error.localizedDescription)")
-            return (activeConfig.version, false, "Check failed")
+            return (activeConfig.version, false, false, "Check failed")
         }
     }
 
@@ -896,6 +901,7 @@ extension XUpdaterService: AddonUpdater {
         return AddonUpdateCheckResult(
             latestVersion: result.latestVersion,
             isUpdateAvailable: result.isUpdateAvailable,
+            needsRepair: result.needsRepair,
             statusMessage: result.statusMessage
         )
     }

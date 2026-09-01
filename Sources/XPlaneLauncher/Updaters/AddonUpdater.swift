@@ -24,8 +24,22 @@ import Foundation
 
 struct AddonUpdateCheckResult: Sendable {
     let latestVersion: String?
+    /// A genuinely newer remote release. File differences alone never set this:
+    /// configuration files the user (or the add-on itself) edits legitimately
+    /// diverge from the remote copy, so treating them as an update would offer
+    /// a download that only overwrites those edits.
     let isUpdateAvailable: Bool
+    /// Local files differ from the remote manifest while the version matches.
+    /// Reported for information only — repairing is the user's call.
+    let needsRepair: Bool
     let statusMessage: String
+
+    init(latestVersion: String?, isUpdateAvailable: Bool, needsRepair: Bool = false, statusMessage: String) {
+        self.latestVersion = latestVersion
+        self.isUpdateAvailable = isUpdateAvailable
+        self.needsRepair = needsRepair
+        self.statusMessage = statusMessage
+    }
 }
 
 protocol AddonUpdater: Sendable {

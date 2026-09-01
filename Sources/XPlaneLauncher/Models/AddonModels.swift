@@ -237,6 +237,9 @@ struct UpdatableAddon: Identifiable, Equatable, Hashable, Sendable {
     var currentVersion: String?
     var latestVersion: String?
     var isUpdateAvailable: Bool = false
+    /// Local files diverge from the remote manifest although the version matches.
+    /// Informational: shown as a hint, never rolled into "Update All".
+    var needsRepair: Bool = false
     var isChecking: Bool = false
     var isUpdating: Bool = false
     var statusMessage: String = "Unknown"

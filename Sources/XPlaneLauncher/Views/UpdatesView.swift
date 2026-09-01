@@ -157,6 +157,9 @@ struct UpdatableAddonRow: View {
         if addon.isUpdateAvailable {
             return .orange
         }
+        if addon.needsRepair {
+            return .secondary
+        }
         let msg = addon.statusMessage.lowercased()
         if msg == "unknown" || msg == "idle" {
             return .secondary
@@ -236,12 +239,11 @@ struct UpdatableAddonRow: View {
                         .clipShape(Capsule())
 
                     if addon.isUpdateAvailable {
-                        let isRepair = (addon.statusMessage.lowercased().contains("repair") || (addon.currentVersion != nil && addon.latestVersion != nil && addon.currentVersion == addon.latestVersion))
-                        Button(isRepair ? "Repair" : "Update") {
+                        Button("Update") {
                             updateManager.updateAddon(addon)
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(isRepair ? .orange : .accentColor)
+                        .tint(.accentColor)
                         .controlSize(.small)
                     } else {
                         Menu {
