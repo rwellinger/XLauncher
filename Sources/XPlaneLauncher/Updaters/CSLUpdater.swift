@@ -22,7 +22,6 @@
 
 import Foundation
 import Observation
-import CryptoKit
 
 // MARK: - CSL Data Models
 
@@ -309,25 +308,9 @@ final class CSLUpdaterService: Sendable {
             return cached
         }
 
-        guard let hash = computeFileMD5(fileURL: fileURL) else { return nil }
+        guard let hash = FileChecksum.md5Hex(of: fileURL) else { return nil }
         await cache.setCachedMD5(hash: hash, path: path, size: size, mtime: mtime)
         return hash
-    }
-
-    private func computeFileMD5(fileURL: URL) -> String? {
-        guard let fileHandle = try? FileHandle(forReadingFrom: fileURL) else { return nil }
-        defer { try? fileHandle.close() }
-
-        var hasher = Insecure.MD5()
-        let bufferSize = 65536 // 64KB
-        while true {
-            let data = fileHandle.readData(ofLength: bufferSize)
-            if data.isEmpty { break }
-            hasher.update(data: data)
-        }
-
-        let digest = hasher.finalize()
-        return digest.map { String(format: "%02x", $0) }.joined()
     }
 
     // MARK: - Remote Index Fetching
@@ -895,7 +878,10 @@ final class CSLManager {
         let effectiveXPlane = xPlaneFolderURL ?? folderURL.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let centralFolder = launcherDataFolder
 
-        Task { @MainActor in
+        // `.utility`: comparing the local files hashes them, and that must not
+        // compete with the rest of the machine — or with X-Plane, if the user
+        // launches it while the check is still running.
+        Task(priority: .utility) { @MainActor in
             do {
                 let indexContent = try await service.fetchRemoteIndex()
                 var rawPackages = CSLIndexParser.parseIndex(content: indexContent)

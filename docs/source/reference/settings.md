@@ -19,7 +19,7 @@ This page details the options available in the **Settings** view.
 
 ## Launch
 
-- **Block launch while the system is under heavy load**: Right after a boot, Spotlight indexing, iCloud sync, and background Shortcuts keep the machine busy, and X-Plane takes far longer to start. While the one-minute load average stays high, the launch button is disabled. A **Launch Anyway** override is always offered, so this never blocks you outright.
+- **Block launch while the system is under heavy load**: Right after a boot, Spotlight indexing, iCloud sync, and background Shortcuts keep the machine busy, and X-Plane takes far longer to start. While other processes keep the CPU busy, the launch button is disabled. XLauncher’s own work, such as checking add-ons for updates, is not counted. A **Launch Anyway** override is always offered, so this never blocks you outright.
 
 ---
 

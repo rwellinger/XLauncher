@@ -191,19 +191,22 @@ class UpdateManager {
             updatableAddons[index].statusMessage = "Checking..."
         }
 
-        Task { @MainActor in
+        // `.utility`: a check checksums every file the backend lists, which on a
+        // large aircraft is gigabytes of reading. That must not compete with the
+        // rest of the machine — or with X-Plane, if it is launched meanwhile.
+        Task(priority: .utility) { @MainActor in
             var next = 0
             await withTaskGroup(of: Void.self) { group in
                 while next < addons.count && next < Self.maxConcurrentChecks {
                     let addon = addons[next]
-                    group.addTask { await self.performCheck(for: addon) }
+                    group.addTask(priority: .utility) { await self.performCheck(for: addon) }
                     next += 1
                 }
 
                 while await group.next() != nil {
                     guard next < addons.count else { continue }
                     let addon = addons[next]
-                    group.addTask { await self.performCheck(for: addon) }
+                    group.addTask(priority: .utility) { await self.performCheck(for: addon) }
                     next += 1
                 }
             }

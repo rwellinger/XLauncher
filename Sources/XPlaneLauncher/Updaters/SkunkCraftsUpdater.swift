@@ -21,7 +21,6 @@
 //
 
 import Foundation
-import zlib
 
 struct SkunkCraftsConfig: Sendable {
     var name: String
@@ -200,14 +199,6 @@ final class SkunkCraftsUpdaterService: Sendable {
         return nil
     }
 
-    private func calculateCRC32UInt32(for url: URL) -> UInt32? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return data.withUnsafeBytes { ptr -> UInt32 in
-            guard let baseAddress = ptr.baseAddress else { return 0 }
-            return UInt32(zlib.crc32(0, baseAddress.assumingMemoryBound(to: Bytef.self), uInt(data.count)))
-        }
-    }
-
     func checkAddonStatus(
         folderURL: URL,
         config: SkunkCraftsConfig,
@@ -286,7 +277,7 @@ final class SkunkCraftsUpdaterService: Sendable {
             if !fileManager.fileExists(atPath: localFileURL.path) {
                 modifiedCount += 1
                 await logHandler("[SkunkCrafts] Missing file: \(item.relativePath)")
-            } else if let expectedCRCStr = item.expectedCRC, let distantCRC = parseCRC32(expectedCRCStr), let localCRC = calculateCRC32UInt32(for: localFileURL) {
+            } else if let expectedCRCStr = item.expectedCRC, let distantCRC = parseCRC32(expectedCRCStr), let localCRC = FileChecksum.crc32(of: localFileURL) {
                 if localCRC != distantCRC {
                     modifiedCount += 1
                     await logHandler("[SkunkCrafts] CRC mismatch for \(item.relativePath) (local: \(localCRC), distant: \(distantCRC))")
@@ -373,7 +364,7 @@ final class SkunkCraftsUpdaterService: Sendable {
 
             if !fileManager.fileExists(atPath: localFileURL.path) {
                 filesToDownload.append(item)
-            } else if let expectedCRCStr = item.expectedCRC, let distantCRC = parseCRC32(expectedCRCStr), let localCRC = calculateCRC32UInt32(for: localFileURL) {
+            } else if let expectedCRCStr = item.expectedCRC, let distantCRC = parseCRC32(expectedCRCStr), let localCRC = FileChecksum.crc32(of: localFileURL) {
                 if localCRC != distantCRC {
                     filesToDownload.append(item)
                 }

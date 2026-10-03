@@ -23,13 +23,13 @@
 import Foundation
 import Observation
 
-/// Polls the system load and tells the UI whether starting X-Plane right now is
-/// a good idea. Blocking is advisory: the launch button always keeps a manual
-/// override so a wrong reading can never lock the user out.
+/// Polls the CPU usage of everything except the launcher itself and tells the
+/// UI whether starting X-Plane right now is a good idea. Blocking is advisory:
+/// the launch button always keeps a manual override so a wrong reading can
+/// never lock the user out.
 @MainActor
 @Observable
 class SystemReadinessManager {
-    private let service = SystemReadinessService.shared
     private let defaults = UserDefaults.standard
 
     /// Cancelled and restarted when the feature flag flips, so no stale loop
@@ -53,7 +53,10 @@ class SystemReadinessManager {
     /// Optimistic until the first sample arrives: never block on startup.
     private(set) var isReady = true
     private(set) var reason = "Ready to launch."
-    private(set) var lastSample: SystemLoadSample?
+    private(set) var lastSample: CPUUsageSample?
+
+    /// Foreign CPU share after smoothing; what the thresholds are applied to.
+    private(set) var smoothedForeignShare: Double?
 
     /// The only thing the launch button needs to know.
     var blocksLaunch: Bool {
@@ -74,20 +77,30 @@ class SystemReadinessManager {
     func startMonitoring() {
         guard blockLaunchOnHighLoad, pollTask == nil else { return }
 
+        // A paused loop restarts from a fresh baseline; carrying the old
+        // average over would judge the machine by how it was minutes ago.
+        smoothedForeignShare = nil
+
         pollTask = Task { [weak self] in
+            var previous = await Self.readCounters()
+            var interval = SystemReadinessService.firstPollInterval
+
             while !Task.isCancelled {
-                let sample = await Task.detached {
-                    SystemReadinessService.shared.sample()
-                }.value
-
-                guard !Task.isCancelled else { return }
-                self?.apply(sample)
-
                 do {
-                    try await Task.sleep(for: SystemReadinessService.pollInterval)
+                    try await Task.sleep(for: interval)
                 } catch {
                     return
                 }
+                interval = SystemReadinessService.pollInterval
+
+                let current = await Self.readCounters()
+                guard !Task.isCancelled else { return }
+
+                if let old = previous, let new = current,
+                   let sample = CPUUsageSample(from: old, to: new, coreCount: SystemReadinessService.shared.coreCount) {
+                    self?.apply(sample)
+                }
+                previous = current ?? previous
             }
         }
     }
@@ -97,21 +110,33 @@ class SystemReadinessManager {
         pollTask = nil
     }
 
+    private nonisolated static func readCounters() async -> CPUCounters? {
+        await Task.detached {
+            SystemReadinessService.shared.readCounters()
+        }.value
+    }
+
     // MARK: - Evaluation
 
-    private func apply(_ sample: SystemLoadSample) {
+    private func apply(_ sample: CPUUsageSample) {
         lastSample = sample
+        let share = SystemReadinessService.smoothed(
+            previous: smoothedForeignShare,
+            current: sample.foreignShare,
+            elapsed: sample.elapsed
+        )
+        smoothedForeignShare = share
 
-        // Hysteresis: once blocked, the load has to fall back below the lower
+        // Hysteresis: once blocked, the usage has to fall back below the lower
         // threshold before the button comes back.
         let threshold = isReady ? SystemReadinessService.busyThreshold : SystemReadinessService.readyThreshold
-        isReady = sample.loadPerCore < threshold
+        isReady = share < threshold
 
         if isReady {
             reason = "Ready to launch."
         } else {
-            let load = String(format: "%.1f", sample.loadOneMinute)
-            reason = "System still busy — load \(load) across \(sample.coreCount) cores (indexing, sync). X-Plane would start slowly."
+            let percent = Int((share * 100).rounded())
+            reason = "System still busy — other processes use \(percent)% of \(sample.coreCount) cores (indexing, sync). X-Plane would start slowly."
         }
     }
 
@@ -119,5 +144,6 @@ class SystemReadinessManager {
         isReady = true
         reason = "Ready to launch."
         lastSample = nil
+        smoothedForeignShare = nil
     }
 }

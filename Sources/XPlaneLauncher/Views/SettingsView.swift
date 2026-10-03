@@ -121,7 +121,7 @@ struct SettingsView: View {
                             Toggle("Block launch while the system is under heavy load", isOn: $readinessManager.blockLaunchOnHighLoad)
                                 .font(.body)
 
-                            Text("Right after a boot, Spotlight indexing, iCloud sync and background Shortcuts keep the machine busy and X-Plane takes far longer to start. While the one-minute load average stays high, the launch button is disabled — a \u{201C}Launch Anyway\u{201D} override is always offered.")
+                            Text("Right after a boot, Spotlight indexing, iCloud sync and background Shortcuts keep the machine busy and X-Plane takes far longer to start. While other processes keep the CPU busy, the launch button is disabled (XLauncher\u{2019}s own add-on checks are not counted) — a \u{201C}Launch Anyway\u{201D} override is always offered.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .padding(.leading, 20)

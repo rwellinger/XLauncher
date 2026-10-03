@@ -312,6 +312,9 @@ struct SceneryRow: View {
     let selection: Set<UUID>
     var onDelete: (() -> Void)? = nil
     var onCreateGroup: (() -> Void)? = nil
+    // `.increased` while the row is drawn selected: the system then renders
+    // primary text white, so the card must let the selection highlight through.
+    @Environment(\.backgroundProminence) private var backgroundProminence
 
     var body: some View {
         HStack(spacing: 12) {
@@ -368,7 +371,7 @@ struct SceneryRow: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(backgroundProminence == .increased ? Color.clear : Color(NSColor.controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)

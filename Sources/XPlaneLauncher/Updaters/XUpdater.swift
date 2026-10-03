@@ -21,7 +21,6 @@
 //
 
 import Foundation
-import CryptoKit
 import zlib
 
 private func decompressGzip(data: Data) -> Data? {
@@ -557,12 +556,6 @@ final class XUpdaterService: Sendable {
         return (latestVersion, remoteSnapshotNum, files)
     }
 
-    private func computeMD5(of fileURL: URL) -> String? {
-        guard let data = try? Data(contentsOf: fileURL, options: .mappedIfSafe) else { return nil }
-        let digest = Insecure.MD5.hash(data: data)
-        return digest.map { String(format: "%02hhx", $0) }.joined()
-    }
-
     func resolveLocalFile(itemPath: String, in folderURL: URL) -> (exists: Bool, actualURL: URL?) {
         guard let directURL = try? PathSecurity.validateSubpath(relativePath: itemPath, within: folderURL) else {
             return (false, nil)
@@ -672,7 +665,7 @@ final class XUpdaterService: Sendable {
                 if exists, let fileURL = actualURL {
                     let isDDSConversion = fileURL.pathExtension.lowercased() == "dds" && (item.path as NSString).pathExtension.lowercased() == "png"
                     if !isDDSConversion, let remoteMD5 = item.md5?.lowercased(), !remoteMD5.isEmpty {
-                        if let localMD5 = computeMD5(of: fileURL)?.lowercased(), localMD5 != remoteMD5 {
+                        if let localMD5 = FileChecksum.md5Hex(of: fileURL)?.lowercased(), localMD5 != remoteMD5 {
                             modifiedCount += 1
                             await logHandler("[X-Updater] Modified file: \(item.path) (local: \(localMD5), remote: \(remoteMD5))")
                         }
@@ -774,7 +767,7 @@ final class XUpdaterService: Sendable {
             } else if let fileURL = actualURL {
                 let isDDSConversion = fileURL.pathExtension.lowercased() == "dds" && (item.path as NSString).pathExtension.lowercased() == "png"
                 if !isDDSConversion, let remoteMD5 = item.md5?.lowercased(), !remoteMD5.isEmpty {
-                    if let localMD5 = computeMD5(of: fileURL)?.lowercased(), localMD5 != remoteMD5 {
+                    if let localMD5 = FileChecksum.md5Hex(of: fileURL)?.lowercased(), localMD5 != remoteMD5 {
                         filesToDownload.append(item)
                     }
                 }
