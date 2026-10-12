@@ -21,6 +21,23 @@ Releases of this fork, when there are any, are published on its
 original project carry none of this fork's changes, so build from source as described
 below unless a fork release is available.
 
+### First Launch (Gatekeeper)
+
+Fork releases are signed ad-hoc and not notarized by Apple, so macOS blocks the first
+launch of a downloaded `XLauncher.app` ("cannot be opened because Apple cannot check it
+for malicious software"). After moving the app to `/Applications`, allow it once in either
+of two ways:
+
+- Open **System Settings → Privacy & Security**, scroll to the message about XLauncher
+  and click **Open Anyway**.
+- Or remove the quarantine flag in Terminal:
+  ```bash
+  xattr -dr com.apple.quarantine /Applications/XLauncher.app
+  ```
+
+A build you create yourself with `./package.sh` is not affected — only downloaded files
+carry the quarantine flag.
+
 ---
 
 ## Building from Source
