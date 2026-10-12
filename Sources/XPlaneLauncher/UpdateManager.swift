@@ -100,6 +100,8 @@ class UpdateManager {
     typealias UpdatableAddon = XPlaneLauncher.UpdatableAddon
 
     init(launcherDataFolder: URL? = nil) {
+        URLCache.shared.removeAllCachedResponses()
+
         if defaults.object(forKey: .autoCheckSkunkCraftsUpdates) == nil {
             self.automaticallyCheckSkunkCraftsUpdates = true
         } else {
@@ -280,8 +282,17 @@ class UpdateManager {
                 )
 
                 if let i = self.updatableAddons.firstIndex(where: { $0.id == addonId }) {
-                    if let latest = self.updatableAddons[i].latestVersion {
-                        self.updatableAddons[i].currentVersion = latest
+                    // Read the version back from the config the update just wrote,
+                    // rather than trusting what the remote advertised.
+                    let updatedAddon = self.updatableAddons[i]
+                    let (_, newVersion, _) = UpdaterScanService.shared.parseUpdaterConfig(
+                        url: updatedAddon.configFileURL,
+                        type: updatedAddon.updaterType,
+                        defaultName: updatedAddon.name
+                    )
+                    if let finalVersion = newVersion ?? updatedAddon.latestVersion {
+                        self.updatableAddons[i].currentVersion = finalVersion
+                        self.updatableAddons[i].latestVersion = finalVersion
                     }
                     self.updatableAddons[i].isUpdating = false
                     self.updatableAddons[i].isUpdateAvailable = false

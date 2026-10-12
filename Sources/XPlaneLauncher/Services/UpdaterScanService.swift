@@ -145,7 +145,7 @@ final class UpdaterScanService: Sendable {
         return nil
     }
 
-    private func parseUpdaterConfig(url: URL, type: UpdaterType, defaultName: String) -> (name: String, version: String?, remoteURL: String?) {
+    func parseUpdaterConfig(url: URL, type: UpdaterType, defaultName: String) -> (name: String, version: String?, remoteURL: String?) {
         switch type {
         case .skunkcrafts:
             if let config = SkunkCraftsUpdaterService.shared.parseConfig(at: url, defaultName: defaultName) {

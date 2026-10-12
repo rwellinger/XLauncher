@@ -93,6 +93,14 @@ struct XUpdaterFileItem: Codable, Sendable {
 final class XUpdaterService: Sendable {
     static let shared = XUpdaterService()
     private var fileManager: FileManager { .default }
+    private let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        config.urlCache = nil
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 300
+        return URLSession(configuration: config)
+    }()
 
     static let defaultXUpdaterHost = "https://update.x-plane.org"
 
@@ -334,7 +342,7 @@ final class XUpdaterService: Sendable {
         }
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await session.data(for: request)
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
             await logHandler("[X-Updater] Auth HTTP Response \(statusCode) (\(data.count) bytes)")
 
@@ -372,7 +380,7 @@ final class XUpdaterService: Sendable {
         request.setValue("1.8.0", forHTTPHeaderField: "XUpdater-Java")
         request.setValue(token, forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
         await logHandler("[X-Updater] File list HTTP Response \(statusCode) (\(data.count) bytes)")
 
@@ -448,7 +456,7 @@ final class XUpdaterService: Sendable {
         request.setValue("1.8.0", forHTTPHeaderField: "XUpdater-Java")
         request.setValue(token, forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
         await logHandler("[X-Updater] Updates API HTTP Response \(statusCode) (\(data.count) bytes)")
 
@@ -637,7 +645,11 @@ final class XUpdaterService: Sendable {
 
         do {
             let (remoteVersion, remoteSnapshotNum, files) = try await checkRemoteVersion(config: activeConfig, logHandler: logHandler)
-            let latestVersion = remoteVersion ?? activeConfig.version
+            var localIsNewer = false
+            if let rVer = remoteVersion, let curVer = activeConfig.version {
+                localIsNewer = VersionComparator.isNewer(curVer, than: rVer)
+            }
+            let latestVersion = localIsNewer ? activeConfig.version : (remoteVersion ?? activeConfig.version)
 
             if files.isEmpty && remoteVersion == nil {
                 await logHandler("[X-Updater] No remote manifest returned; assuming \(activeConfig.name) is up to date.")
@@ -681,12 +693,18 @@ final class XUpdaterService: Sendable {
 
             let totalChanges = modifiedCount + missingCount + deleteCount
             let snapshotMismatch = (remoteSnapshotNum != nil && activeConfig.snapshotNum != nil && remoteSnapshotNum! > activeConfig.snapshotNum!)
-            let versionMismatch = (remoteVersion != nil && remoteVersion != activeConfig.version)
+            let versionMismatch: Bool
+            if let rVer = remoteVersion, let curVer = activeConfig.version {
+                versionMismatch = VersionComparator.isNewer(rVer, than: curVer)
+            } else {
+                versionMismatch = remoteVersion != nil
+            }
             // Only a newer remote release counts as an update. Files differing at the
             // same version are usually legitimate local configuration changes, so they
-            // are reported as a repair hint instead of an offered download.
+            // are reported as a repair hint instead of an offered download. A local
+            // version ahead of the remote must not be checked against the older manifest.
             let isUpdateAvailable = snapshotMismatch || versionMismatch
-            let needsRepair = !isUpdateAvailable && totalChanges > 0
+            let needsRepair = !isUpdateAvailable && !localIsNewer && totalChanges > 0
 
             var statusMessage = "Up to date"
             if isUpdateAvailable {
@@ -807,7 +825,7 @@ final class XUpdaterService: Sendable {
                   let downloadURL = URL(string: downloadURLString) else { continue }
 
             await logHandler("[X-Updater] Fetching \(downloadURL.absoluteString)...")
-            let (fileData, response) = try await URLSession.shared.data(from: downloadURL)
+            let (fileData, response) = try await session.data(from: downloadURL)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else {
                 await logHandler("[X-Updater] Failed download for \(item.path) (HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0))")
                 continue

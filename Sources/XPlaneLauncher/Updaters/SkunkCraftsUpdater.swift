@@ -38,6 +38,14 @@ struct SkunkCraftsFileItem: Sendable {
 final class SkunkCraftsUpdaterService: Sendable {
     static let shared = SkunkCraftsUpdaterService()
     private var fileManager: FileManager { .default }
+    private let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        config.urlCache = nil
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 300
+        return URLSession(configuration: config)
+    }()
 
     // MARK: - Config Detection & Parsing
 
@@ -173,8 +181,19 @@ final class SkunkCraftsUpdaterService: Sendable {
 
     // MARK: - Remote Data Fetching & CRC Verification
 
+    /// Updater manifests are served with caching headers; a cached copy hides a
+    /// freshly published version, so every request bypasses all caches.
+    private static func uncachedRequest(for url: URL) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.setValue("no-cache", forHTTPHeaderField: "Pragma")
+        URLCache.shared.removeCachedResponse(for: request)
+        return request
+    }
+
     private func fetchTextContent(from url: URL) async throws -> String {
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await session.data(for: Self.uncachedRequest(for: url))
         guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
             throw URLError(.badServerResponse)
         }
@@ -285,13 +304,20 @@ final class SkunkCraftsUpdaterService: Sendable {
             }
         }
 
-        let versionMismatch = (remoteVersion != nil && config.version != nil && remoteVersion != config.version)
+        var versionMismatch = false
+        var localIsNewer = false
+        if let remoteVersion, let localVersion = config.version {
+            versionMismatch = VersionComparator.isNewer(remoteVersion, than: localVersion)
+            localIsNewer = VersionComparator.isNewer(localVersion, than: remoteVersion)
+        }
         // Only a newer remote version counts as an update. Differing files at the
         // same version are almost always legitimate local configuration changes,
         // so they are reported as a repair hint instead of an offered download.
+        // A local version ahead of the remote (pre-release, manual install) must
+        // not be compared against the older manifest at all.
         let isUpdateAvailable = versionMismatch
-        let needsRepair = !versionMismatch && modifiedCount > 0
-        let latestVersion = remoteVersion ?? config.version
+        let needsRepair = !versionMismatch && !localIsNewer && modifiedCount > 0
+        let latestVersion = localIsNewer ? config.version : (remoteVersion ?? config.version)
 
         var statusMessage = "Up to date"
         if versionMismatch, let rVersion = remoteVersion {
@@ -300,7 +326,9 @@ final class SkunkCraftsUpdaterService: Sendable {
             } else {
                 statusMessage = "Update available (\(rVersion))"
             }
-            await logHandler("[SkunkCrafts] Version mismatch: Local '\(config.version ?? "none")' vs Remote '\(rVersion)'")
+            await logHandler("[SkunkCrafts] Newer remote version found: Local '\(config.version ?? "none")' vs Remote '\(rVersion)'")
+        } else if localIsNewer {
+            await logHandler("[SkunkCrafts] Local version '\(config.version ?? "none")' is newer than remote '\(remoteVersion ?? "none")'. \(config.name) is up to date.")
         } else if needsRepair {
             statusMessage = "Up to date (\(modifiedCount) modified file\(modifiedCount > 1 ? "s" : ""))"
             await logHandler("[SkunkCrafts] \(config.name) is on the latest version; \(modifiedCount) file\(modifiedCount > 1 ? "s differ" : " differs") locally")
@@ -389,7 +417,7 @@ final class SkunkCraftsUpdaterService: Sendable {
             let downloadURL = baseURL.appendingPathComponent(item.relativePath)
             await logHandler("[SkunkCrafts] Fetching \(downloadURL.absoluteString)...")
 
-            let (fileData, response) = try await URLSession.shared.data(from: downloadURL)
+            let (fileData, response) = try await session.data(for: Self.uncachedRequest(for: downloadURL))
             guard (response as? HTTPURLResponse)?.statusCode == 200 else {
                 await logHandler("[SkunkCrafts] Download failed for \(item.relativePath) (HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0))")
                 continue
