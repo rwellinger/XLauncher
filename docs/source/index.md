@@ -3,9 +3,10 @@
 **X-Plane Launcher** (XLauncher) is a native macOS manager and profile-based launcher for **X-Plane 12**.
 
 :::{note}
-This documentation covers a **fork** of
-[jcorbier/x-plane-launcher](https://github.com/jcorbier/x-plane-launcher). It carries
-changes that are not part of the original, and in-app self-updating is disabled — see
+This documentation covers an independent **fork** of
+[jcorbier/XLauncher](https://github.com/jcorbier/XLauncher), maintained by thWelly. It
+carries changes that are not part of the original and does not include the original's
+Pro edition. In-app self-updating is disabled — see
 [Installation](getting-started/installation.md).
 :::
 

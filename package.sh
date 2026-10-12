@@ -64,8 +64,6 @@ cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"
     </dict>
     <key>SUEnableAutomaticChecks</key>
     <false/>
-    <key>SUPublicEDKey</key>
-    <string>UwSNDkYiukbvlZen5gfKSVpMuKo9u92MSF80c9qtk8A=</string>
 </dict>
 </plist>
 EOF

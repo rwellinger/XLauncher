@@ -10,8 +10,8 @@ import sys
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'X-Plane Launcher'
-copyright = '2026, Jeremie Corbier'
-author = 'Jeremie Corbier'
+copyright = '2026, Jeremie Corbier, thWelly'
+author = 'thWelly'
 release = '0.6.1'
 version = '0.6.1'
 
@@ -76,8 +76,8 @@ html_theme_options = {
 
 html_context = {
     'display_github': True,
-    'github_user': 'jcorbier',
-    'github_repo': 'x-plane-launcher',
+    'github_user': 'rwellinger',
+    'github_repo': 'XLauncher',
     'github_version': 'main',
     'conf_py_path': '/docs/source/',
 }

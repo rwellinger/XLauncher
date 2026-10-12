@@ -189,7 +189,7 @@ jobs:
             mkdir -p sparkle_staging
             cp XLauncher-macOS.zip sparkle_staging/
             echo "$SPARKLE_PRIVATE_KEY" > sparkle_key.txt
-            DOWNLOAD_PREFIX="https://github.com/jcorbier/XLauncher/releases/download/${TAG_NAME}/"
+            DOWNLOAD_PREFIX="https://github.com/rwellinger/XLauncher/releases/download/${TAG_NAME}/"
             "$GENERATE_APPCAST" --download-url-prefix "$DOWNLOAD_PREFIX" --ed-key-file sparkle_key.txt sparkle_staging/ || true
             if [ -f "sparkle_staging/appcast.xml" ]; then
               cp sparkle_staging/appcast.xml ./appcast.xml

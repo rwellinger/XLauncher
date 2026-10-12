@@ -1,10 +1,10 @@
 # X-Plane Launcher
 
-> **This is a fork.** It is based on
-> [jcorbier/x-plane-launcher](https://github.com/jcorbier/x-plane-launcher) and
-> carries changes that are not part of the original. It is not an official
-> release — for the upstream version, downloads, and support, please go to the
-> original repository.
+> **This is an independent fork**, maintained by thWelly. It is based on
+> [jcorbier/XLauncher](https://github.com/jcorbier/XLauncher) by Jeremie Corbier
+> and carries changes that are not part of the original. It does not include the
+> original's Pro edition. For the upstream version, its downloads, and support,
+> please go to the original repository.
 >
 > In-app self-updating is **disabled** in this fork. The upstream update feed
 > serves builds without these changes, so installing from it would roll you back.
@@ -35,7 +35,7 @@ X-Plane Launcher lets you organize your add-ons in a central folder, create dist
 
 ### Pre-built binaries
 
-Download the latest `XLauncher.dmg` from the original project's [Releases](https://github.com/jcorbier/x-plane-launcher/releases) page and move `XLauncher.app` to your Applications folder. Those builds do **not** include this fork's changes — build from source for that.
+Fork releases, when there are any, are published on this repository's [Releases](https://github.com/rwellinger/XLauncher/releases) page. Builds from the original project do **not** include this fork's changes — build from source for that.
 
 ### Building from source
 

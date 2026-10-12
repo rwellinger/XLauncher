@@ -24,8 +24,9 @@ import Foundation
 
 enum AppInfo {
     static let appName = "X-Plane Launcher"
-    static let author = "Jeremie Corbier"
-    static let copyright = "Copyright © 2026 Jeremie Corbier"
+    static let maintainer = "thWelly"
+    static let originalAuthor = "Jeremie Corbier"
+    static let copyright = "Copyright © 2026 Jeremie Corbier, thWelly"
     static let license = "MIT License"
 
     static var version: String {
@@ -54,14 +55,14 @@ enum AppInfo {
     }
 
     // Repository links point at this fork: upstream releases do not carry the
-    // fork's changes, so offering them would roll the user back. The author
-    // link stays with the original author.
+    // fork's changes, so offering them would roll the user back.
     static let githubURL = URL(string: "https://github.com/rwellinger/XLauncher")!
     static let releasesURL = URL(string: "https://github.com/rwellinger/XLauncher/releases")!
     static let latestReleaseAPIURL = URL(string: "https://api.github.com/repos/rwellinger/XLauncher/releases/latest")!
     static let allReleasesAPIURL = URL(string: "https://api.github.com/repos/rwellinger/XLauncher/releases")!
     static let appcastURL = URL(string: "https://github.com/rwellinger/XLauncher/releases/latest/download/appcast.xml")!
-    static let authorURL = URL(string: "https://github.com/jcorbier")!
+    static let maintainerURL = URL(string: "https://github.com/rwellinger")!
+    static let originalAuthorURL = URL(string: "https://github.com/jcorbier")!
 
     /// The fork has no hosted documentation build, so this points at the
     /// sources in the repository, which GitHub renders directly.
@@ -69,6 +70,7 @@ enum AppInfo {
 
     static let licenseText = """
     Copyright (c) 2026 Jeremie Corbier
+    Copyright (c) 2026 thWelly
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal

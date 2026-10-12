@@ -1,10 +1,9 @@
 # Installation
 
 :::{note}
-This documentation describes a **fork** of
-[jcorbier/x-plane-launcher](https://github.com/jcorbier/x-plane-launcher). Pre-built
-binaries from the original project do not contain this fork's changes — build from
-source instead.
+This documentation describes an independent **fork** of
+[jcorbier/XLauncher](https://github.com/jcorbier/XLauncher). Pre-built binaries from
+the original project do not contain this fork's changes — build from source instead.
 :::
 
 ## System Requirements
@@ -17,10 +16,10 @@ source instead.
 
 ## Pre-Built Binaries
 
-The original project publishes `XLauncher.dmg` on its
-[GitHub Releases](https://github.com/jcorbier/x-plane-launcher/releases) page. Those
-builds are the upstream version and carry none of this fork's changes, so use them only
-if you want the original application. Otherwise build from source as described below.
+Releases of this fork, when there are any, are published on its
+[GitHub Releases](https://github.com/rwellinger/XLauncher/releases) page. Builds from the
+original project carry none of this fork's changes, so build from source as described
+below unless a fork release is available.
 
 ---
 

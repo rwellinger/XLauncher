@@ -31,7 +31,7 @@ When executing scripts before launch, X-Plane Launcher passes environment variab
 
 ## Example: Hoppie ACARS Script
 
-Here is an example script ([`examples/hoppie.sh`](https://github.com/jcorbier/x-plane-launcher/blob/main/examples/hoppie.sh)) that sends an authentication request to the Hoppie ACARS network:
+Here is an example script ([`examples/hoppie.sh`](https://github.com/rwellinger/XLauncher/blob/main/examples/hoppie.sh)) that sends an authentication request to the Hoppie ACARS network:
 
 ```bash
 #!/bin/bash

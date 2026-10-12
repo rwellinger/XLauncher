@@ -201,30 +201,21 @@ struct AboutView: View {
                     // Author & Copyright
                     GroupBox("Author & Credits") {
                         VStack(spacing: 8) {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Created by")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Text(AppInfo.author)
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-                                }
+                            CreditRow(
+                                role: "Maintained by",
+                                name: AppInfo.maintainer,
+                                handle: "@rwellinger",
+                                url: AppInfo.maintainerURL
+                            )
 
-                                Spacer()
+                            Divider()
 
-                                Button(action: {
-                                    NSWorkspace.shared.open(AppInfo.authorURL)
-                                }) {
-                                    HStack(spacing: 4) {
-                                        Text("@jcorbier")
-                                            .font(.caption)
-                                        Image(systemName: "arrow.up.right")
-                                            .font(.caption2)
-                                    }
-                                }
-                                .buttonStyle(.link)
-                            }
+                            CreditRow(
+                                role: "Based on XLauncher by",
+                                name: AppInfo.originalAuthor,
+                                handle: "@jcorbier",
+                                url: AppInfo.originalAuthorURL
+                            )
 
                             Divider()
 
@@ -342,5 +333,39 @@ private struct LinkRow: View {
             .controlSize(.small)
         }
         .padding(.vertical, 2)
+    }
+}
+
+private struct CreditRow: View {
+    let role: String
+    let name: String
+    let handle: String
+    let url: URL
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(role)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(name)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+            }
+
+            Spacer()
+
+            Button(action: {
+                NSWorkspace.shared.open(url)
+            }) {
+                HStack(spacing: 4) {
+                    Text(handle)
+                        .font(.caption)
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption2)
+                }
+            }
+            .buttonStyle(.link)
+        }
     }
 }
