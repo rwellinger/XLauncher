@@ -194,15 +194,6 @@ struct AboutView: View {
                                 subtitle: "Download binary packages and view version release notes",
                                 url: AppInfo.releasesURL
                             )
-
-                            Divider()
-
-                            LinkRow(
-                                icon: "ladybug",
-                                title: "Issue Tracker",
-                                subtitle: "Report bugs, issues, or request new features",
-                                url: AppInfo.issuesURL
-                            )
                         }
                         .padding(8)
                     }
